@@ -11,13 +11,14 @@
   <header class="topbar">
     <div class="brand"><span class="logo" aria-hidden="true">◎</span> PhishLens</div>
     <nav id="nav" class="nav hidden" aria-label="Main">
+      <a href="#/dashboard" data-perm="result:read">Dashboard</a>
       <a href="#/analyze" data-perm="sample:write">Analyze</a>
       <a href="#/history" data-perm="result:read">History</a>
       <a href="#/dataset" data-perm="sample:write">Dataset</a>
       <a href="#/admin" data-perm="config:read">Admin</a>
     </nav>
     <div id="who" class="who hidden">
-      <span id="who-name"></span> <span id="who-role" class="pill"></span>
+      <a id="who-name" href="#/account" title="Account settings"></a> <span id="who-role" class="pill"></span>
       <button id="logout" class="link">Sign out</button>
     </div>
   </header>

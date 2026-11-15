@@ -197,3 +197,30 @@ def test_recovery_after_restart(client):
     ha = login(client, "admin")
     assert client.get("/api/analyses", headers=ha).json()["items"]
     assert client.get("/api/admin/audit/verify", headers=ha).json()["valid"] is True
+
+
+# ---------------------------------------------------------------- dashboard + account
+def test_dashboard_for_all_roles(client):
+    for role in ("admin", "analyst", "viewer"):
+        login(client, role)
+        r = client.get("/api/dashboard")
+        assert r.status_code == 200
+        body = r.json()
+        assert {"status", "totals", "by_decision", "top_rules", "latency"} <= set(body)
+        if role == "viewer":
+            assert body["feedback"] is None and all("filename" not in x for x in body["recent_high_risk"])
+
+
+def test_password_change_flow(client):
+    import time
+    from .conftest import PASSWORDS
+    h = login(client, "viewer")
+    bad = client.post("/api/auth/password", headers=h, json={"current_password": "wrong-one-123", "new_password": "Brand-new-pass-9"})
+    assert bad.status_code == 401
+    weak = client.post("/api/auth/password", headers=h, json={"current_password": PASSWORDS["viewer"], "new_password": "short"})
+    assert weak.status_code == 422
+    ok = client.post("/api/auth/password", headers=h, json={"current_password": PASSWORDS["viewer"], "new_password": "Brand-new-pass-9"})
+    assert ok.status_code == 200
+    assert client.get("/api/auth/me").status_code == 200  # current session survives
+    # change it back so other tests keep working
+    client.post("/api/auth/password", headers=h, json={"current_password": "Brand-new-pass-9", "new_password": PASSWORDS["viewer"]})

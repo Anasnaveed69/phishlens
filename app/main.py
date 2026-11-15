@@ -15,7 +15,7 @@ from . import services
 from .config import BASE_DIR
 from .db import get_conn, init_db
 from .errors import install_handlers
-from .routers import admin, analyses, auth, samples
+from .routers import admin, analyses, auth, dashboard, samples
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 FRONTEND = BASE_DIR / "frontend"
@@ -56,6 +56,7 @@ app.include_router(auth.router)
 app.include_router(samples.router)
 app.include_router(analyses.router)
 app.include_router(admin.router)
+app.include_router(dashboard.router)
 
 
 @app.get("/api/health")

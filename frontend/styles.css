@@ -87,3 +87,18 @@ tr.clickable { cursor: pointer; } tr.clickable:hover { background: #f8f9fc; }
 .tabs { display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid var(--line); }
 .tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; }
 .tabs button.active { border-bottom-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+.hbar { display: grid; grid-template-columns: 100px 1fr 50px; gap: 10px; align-items: center; margin: 8px 0; }
+.hbar-track { height: 12px; background: #eef0f4; border-radius: 6px; overflow: hidden; }
+.hbar-track .fill { display: block; height: 100%; border-radius: 6px; }
+.fill.phishing { background: var(--bad); } .fill.suspicious { background: #e3a008; } .fill.benign { background: var(--ok); }
+.stat { font-size: 13px; color: var(--muted); }
+.stat b { color: var(--ink); }
+
+@media print {
+  .topbar, .foot, .toast, .row button, .row a, form, details { display: none !important; }
+  body { background: #fff; }
+  main { margin: 0; max-width: none; }
+  .card, .verdict { break-inside: avoid; border-color: #ccc; }
+  .grid2 { grid-template-columns: 1fr 1fr; }
+}

@@ -109,7 +109,7 @@ function loginView() {
         const data = await api("/api/auth/login", { method: "POST", json: {
           username: form.username.value, password: form.password.value } });
         setSession(data);
-        const target = can("sample:write") ? "#/analyze" : "#/history";
+        const target = "#/dashboard";
         if (location.hash === target) route(); else location.hash = target;
       } catch (ex) { err.textContent = ex.message; } finally { btn.disabled = false; }
     },
@@ -243,6 +243,7 @@ async function resultView(id) {
         catch (ex) { toast(ex.message, true); }
       },
     }, "Re-analyze with current config"),
+    h("button", { onclick: () => window.print() }, "Print / save as PDF"),
     h("a", { href: `#/history?sample=${r.sample_id}` }, "All runs of this page"),
   );
 
@@ -299,9 +300,18 @@ async function historyView(params) {
   const stats = h("div", { class: "stats" },
     ["phishing", "suspicious", "benign"].map((d) => h("div", { class: "stat" }, h("b", {}, c[d] || 0), h("span", { class: `pill ${d}` }, d))));
 
+  const picked = new Set();
+  const compareBtn = h("button", { type: "button", disabled: true,
+    onclick: () => { const [x, y] = [...picked]; location.hash = `#/compare?a=${x}&b=${y}`; } }, "Compare selected (0/2)");
+  const pick = (id, box) => {
+    if (box.checked) { if (picked.size >= 2) { box.checked = false; return toast("Select only two."); } picked.add(id); }
+    else picked.delete(id);
+    compareBtn.textContent = `Compare selected (${picked.size}/2)`; compareBtn.disabled = picked.size !== 2;
+  };
   const rows = data.items.map((a) => h("tr", { class: "clickable", tabindex: 0,
-    onclick: () => (location.hash = `#/result/${a.id}`),
-    onkeydown: (e) => { if (e.key === "Enter") location.hash = `#/result/${a.id}`; } },
+    onclick: (e) => { if (e.target.tagName !== "INPUT") location.hash = `#/result/${a.id}`; },
+    onkeydown: (e) => { if (e.key === "Enter" && e.target.tagName !== "INPUT") location.hash = `#/result/${a.id}`; } },
+    h("td", {}, h("input", { type: "checkbox", "aria-label": "Select for comparison", onchange: (e) => pick(a.id, e.target) })),
     h("td", {}, fmtTime(a.created_at)),
     h("td", {}, a.filename || "—", a.source_url ? h("div", { class: "mono muted" }, a.source_url) : null),
     h("td", {}, h("span", { class: `pill ${a.decision}` }, a.decision)),
@@ -311,8 +321,9 @@ async function historyView(params) {
     h("td", {}, a.label || "—"),
   ));
   render(h("section", { class: "card" }, h("h2", {}, sample ? "Runs of one page" : "Analysis history"), stats, filters,
-    h("table", {}, h("thead", {}, h("tr", {}, ["When", "Page", "Decision", "Score", "Severity", "Config", "Label"].map((x) => h("th", {}, x)))),
-      h("tbody", {}, rows.length ? rows : h("tr", {}, h("td", { colspan: 7, class: "muted" }, "No analyses yet."))))));
+    h("div", { class: "row" }, compareBtn),
+    h("table", {}, h("thead", {}, h("tr", {}, ["", "When", "Page", "Decision", "Score", "Severity", "Config", "Label"].map((x) => h("th", {}, x)))),
+      h("tbody", {}, rows.length ? rows : h("tr", {}, h("td", { colspan: 8, class: "muted" }, "No analyses yet."))))));
 }
 
 function datasetView() {
@@ -339,6 +350,93 @@ function datasetView() {
     h("div", { class: "row" }, h("button", { class: "primary", type: "submit" }, "Import")),
   );
   render(h("section", { class: "card" }, h("h2", {}, "Import labeled dataset"), form, out));
+}
+
+// ---------------------------------------------------------------- dashboard
+async function dashboardView() {
+  let d;
+  try { d = await api("/api/dashboard"); } catch (e) { return render(h("section", { class: "card" }, e.message)); }
+  const dec = d.by_decision || {};
+  const sev = d.by_severity || {};
+  const total = d.totals.analyses || 0;
+  const bar = (label, n, cls) => {
+    const fill = h("span", { class: `fill ${cls}` }); fill.style.width = `${total ? (n / total) * 100 : 0}%`;
+    return h("div", { class: "hbar" }, h("span", { class: "hbar-label" }, label), h("span", { class: "hbar-track" }, fill), h("b", {}, n));
+  };
+  const status = h("section", { class: "card" }, h("h2", {}, "System status"),
+    h("div", { class: "stats" },
+      h("div", { class: "stat" }, h("b", {}, total), "analyses"),
+      h("div", { class: "stat" }, h("b", {}, d.totals.last_24h), "last 24 h"),
+      h("div", { class: "stat" }, h("b", {}, d.totals.samples), `pages (${d.totals.labeled_samples} labeled)`),
+      h("div", { class: "stat" }, h("b", {}, d.latency ? `${d.latency.mean_ms} ms` : "—"), d.latency ? `avg latency · p95 ${d.latency.p95_ms} ms` : "latency"),
+      h("div", { class: "stat" }, h("b", {}, d.status.model === "loaded" ? "Hybrid" : "Rules only"),
+        d.status.model_version ? `model ${d.status.model_version}` : `model ${d.status.model}`),
+      h("div", { class: "stat" }, h("b", {}, `v${d.status.config_version}`), "config")));
+  const decisions = h("section", { class: "card" }, h("h2", {}, "Decisions"),
+    bar("Phishing", dec.phishing || 0, "phishing"), bar("Suspicious", dec.suspicious || 0, "suspicious"), bar("Benign", dec.benign || 0, "benign"),
+    h("h3", {}, "Severity (last 500)"),
+    h("div", { class: "row" }, ["high", "medium", "low", "none"].map((k) => h("span", { class: `pill ${k}` }, `${k}: ${sev[k] || 0}`))));
+  const rules = h("section", { class: "card" }, h("h2", {}, "Most frequent indicators"),
+    d.top_rules.length ? h("table", {}, h("tbody", {}, d.top_rules.map((r) => h("tr", {}, h("td", { class: "mono" }, r.id), h("td", {}, r.name), h("td", {}, r.count)))))
+      : h("p", { class: "muted" }, "No rules have fired yet."));
+  const risky = h("section", { class: "card" }, h("h2", {}, "Recent phishing detections"),
+    d.recent_high_risk.length ? h("table", {}, h("tbody", {}, d.recent_high_risk.map((r) => h("tr", {
+      class: "clickable", tabindex: 0, onclick: () => (location.hash = `#/result/${r.id}`),
+      onkeydown: (e) => { if (e.key === "Enter") location.hash = `#/result/${r.id}`; } },
+      h("td", {}, fmtTime(r.created_at)), h("td", {}, r.filename || "—"), h("td", {}, pct(r.score)),
+      h("td", {}, r.top_reason || "")))))
+      : h("p", { class: "muted" }, "No phishing detections yet."));
+  const fb = d.feedback ? h("section", { class: "card" }, h("h2", {}, "Analyst feedback"),
+    h("div", { class: "stats" }, ["correct", "false_positive", "false_negative"].map((k) =>
+      h("div", { class: "stat" }, h("b", {}, d.feedback[k] || 0), k.replace("_", " "))))) : null;
+  render(status, h("div", { class: "grid2" }, decisions, rules), risky, fb);
+}
+
+// ---------------------------------------------------------------- compare
+async function compareView(params) {
+  const a = params.get("a"), b = params.get("b");
+  if (!a || !b) return render(h("section", { class: "card" }, "Pick two analyses in History, then press Compare."));
+  let ra, rb;
+  try { [ra, rb] = await Promise.all([api(`/api/analyses/${encodeURIComponent(a)}`), api(`/api/analyses/${encodeURIComponent(b)}`)]); }
+  catch (e) { return render(h("section", { class: "card" }, e.message)); }
+  const col = (r) => h("div", {},
+    h("div", { class: `verdict ${r.decision}` }, h("div", { class: "big" }, r.decision),
+      h("div", {}, h("div", {}, r.filename || ""), h("div", { class: "meta" }, `score ${pct(r.score)} · config v${r.config_version} · ${fmtTime(r.created_at)}`))),
+    ...(r.rules ? r.rules.fired.map((f) => h("div", { class: `rule ${f.severity}` }, h("div", { class: "name" }, `${f.id} · ${f.name}`),
+      f.evidence.length ? h("div", {}, f.evidence.map((e) => h("span", { class: "evidence" }, e))) : null))
+      : (r.reasons || []).map((x) => h("div", { class: "rule" }, x.name))),
+    r.rules && !r.rules.fired.length ? h("p", { class: "muted" }, "No rules fired.") : null,
+    h("a", { href: `#/result/${r.id}` }, "Open full result"));
+  const diffRows = [];
+  if (ra.features && rb.features) {
+    for (const k of Object.keys(ra.features)) {
+      if (ra.features[k] !== rb.features[k]) diffRows.push(h("tr", {}, h("td", { class: "mono" }, k), h("td", {}, String(ra.features[k])), h("td", {}, String(rb.features[k]))));
+    }
+  }
+  render(h("section", { class: "card" }, h("h2", {}, "Compare two analyses"), h("div", { class: "grid2" }, col(ra), col(rb))),
+    diffRows.length ? h("section", { class: "card" }, h("h2", {}, `Features that differ (${diffRows.length})`),
+      h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Feature"), h("th", {}, "Left"), h("th", {}, "Right"))), h("tbody", {}, diffRows))) : null);
+}
+
+// ---------------------------------------------------------------- account
+function accountView() {
+  const err = h("p", { class: "error", role: "alert" });
+  const form = h("form", {
+    onsubmit: async (e) => {
+      e.preventDefault(); err.textContent = "";
+      if (form.new_password.value !== form.repeat.value) { err.textContent = "New passwords do not match."; return; }
+      try {
+        await api("/api/auth/password", { method: "POST", json: { current_password: form.current_password.value, new_password: form.new_password.value } });
+        form.reset(); toast("Password changed. Other sessions were signed out.");
+      } catch (ex) { err.textContent = ex.message; }
+    },
+  },
+    h("label", { for: "cp" }, "Current password"), h("input", { id: "cp", name: "current_password", type: "password", autocomplete: "current-password", required: true }),
+    h("label", { for: "np" }, "New password ", h("span", { class: "hint" }, "(10+ characters, mix letters with numbers or symbols)")),
+    h("input", { id: "np", name: "new_password", type: "password", autocomplete: "new-password", required: true, minlength: 10 }),
+    h("label", { for: "rp" }, "Repeat new password"), h("input", { id: "rp", name: "repeat", type: "password", autocomplete: "new-password", required: true }),
+    err, h("div", { class: "row" }, h("button", { class: "primary", type: "submit" }, "Change password")));
+  render(h("section", { class: "card narrow" }, h("h2", {}, `Account · ${state.user.username}`), form));
 }
 
 // ---------------------------------------------------------------- admin
@@ -463,7 +561,10 @@ async function route() {
     case "dataset": return datasetView();
     case "admin": return adminView(parts[1]);
     case "history": return historyView(params);
-    default: location.hash = can("sample:write") ? "#/analyze" : "#/history";
+    case "dashboard": return dashboardView();
+    case "compare": return compareView(params);
+    case "account": return accountView();
+    default: location.hash = "#/dashboard";
   }
 }
 
