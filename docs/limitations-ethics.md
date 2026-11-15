@@ -1,6 +1,8 @@
 # Limitations and ethics
 
 ## Limitations
+* **Development estimates vs final result.** Rules were designed with error analysis that saw the development
+  test split; the headline numbers therefore come from a separate fresh holdout of unseen pages.
 * **One dataset, one period.** Numbers come from a 2000-page sample of PhreshPhish (2024–2025, English).
   Other periods, languages or targeted phishing may behave differently.
 * **Dataset shortcut.** In the data, benign pages are big full websites and phishing pages are small, so models
@@ -14,8 +16,12 @@
 * **Domain parsing is approximate** (no full public-suffix list, to avoid network access).
 * **Rate limiter is in-memory** and per-process; it resets on restart.
 * **Local demo runs over HTTP.** Set `PHISHLENS_COOKIE_SECURE=1` and use TLS for any real deployment.
-* Someone with OS-level access to the machine can still replace files; the audit hash chain detects edits
-  but cannot prevent them.
+* The audit chain is HMAC-keyed (`secrets/audit.key`, outside `data/`): a copied or edited database cannot be
+  re-chained without the key, but someone holding both could rewrite it, and deleting the newest rows is only
+  detectable against an external copy of the chain head (returned by `/api/admin/audit/verify`).
+* A model file plus its metadata can be swapped together unless `PHISHLENS_MODEL_SHA256` pins the hash.
+* The login limiter is keyed on IP; on a shared machine (all 127.0.0.1) repeated bad logins temporarily lock an
+  account — a deliberate trade-off against brute force.
 
 ## Ethics
 * Only safe, synthetic or **instructor-approved archived** samples are used. We never visit live phishing

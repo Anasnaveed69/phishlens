@@ -67,6 +67,7 @@ def main() -> None:
         "repo_url": "https://github.com/Anasnaveed69/phishlens",
         "report_date": date.today().strftime("%d %B %Y"),
         "n_features": len(ev.get("feature_order", NUMERIC_FEATURES)),
+        "n_features_total": len(NUMERIC_FEATURES),
         "n_rules": len(RULES),
         "tests_passed": passed, "tests_total": total,
         "ci_pythons": "3.11 and 3.12",
@@ -80,6 +81,9 @@ def main() -> None:
             ["Safe failure: no model / tampered model", "Rules-only mode, no crash", "mode=rules_only (test_rules_only_mode_when_no_model); SHA-256 check on load"],
             ["Recovery after restart", "Data, config and audit chain intact", "chain valid after re-init (test_recovery_after_restart)"],
             ["Brute force / session fixation / cross-session CSRF", "Blocked", "429 / 401 / 403 (tests/test_security.py)"],
+            ["80 concurrent requests", "Audit chain stays valid", "verify = valid (test_audit_chain_survives_concurrent_requests)"],
+            ["Malformed URL (http://[::1)", "Validation error, not a crash", "422 INVALID_INPUT (test_malformed_url_is_a_validation_error)"],
+            ["Corrupt model metadata", "Rules-only mode, app keeps running", "load_failed (test_corrupt_model_metadata_falls_back_to_rules)"],
         ],
         "screens": [{"file": f, "caption": c} for f, c in screens if (ROOT / f).exists()],
     }

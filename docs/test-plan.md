@@ -1,17 +1,28 @@
 # Test plan and results
 
-Automated tests: `pytest -q` → **65 / 65 passing** (engine, API, security misuse).
+Automated tests: `pytest -q` → **71 / 71 passing** (engine, API, security misuse).
 CI runs them on every push (`.github/workflows/tests.yml`). Acceptance: ≥ 80% passing and no open critical
 authorization, injection, secret-exposure or unsafe-file-handling defects — **met**.
 
 ## Dataset and protocol
 Real archived pages from **PhreshPhish** (2025, CC BY 4.0): 2000 pages (1000 phishing / 1000 benign),
 stratified split 1400 train / 600 test, seed 42. Model choice, ML weight and thresholds were tuned with
-5-fold cross-validation **inside the training split only**; the test split was scored once.
+5-fold cross-validation **inside the training split only**. The rule/feature design, however, was iterated
+using error analysis on development runs that included the test pages, so these test-split numbers are
+**development estimates**. The unbiased result is the fresh holdout below.
 Reproduce: `python scripts/fetch_phreshphish.py --per-class 1000` then
 `python scripts/evaluate.py --data phreshphish_sample --drop-size-features`. Full output: [reports/evaluation.md](../reports/evaluation.md).
 
-## T1–T3: precision, recall, F1 (600 held-out real pages)
+## Final result: fresh, unseen holdout
+1000 pages streamed from PhreshPhish with a different seed, excluding all 2000 development pages, scored by the
+frozen model `rf-20261115123403` and config — nothing tuned on them ([reports/holdout.md](../reports/holdout.md)):
+
+| Band | Precision | Recall | F1 | FPR | ROC-AUC |
+|---|---|---|---|---|---|
+| Flag for review (suspicious+) | 0.964 | 0.904 | **0.933** | 3.4% | 0.984 |
+| High-confidence phishing | **0.998** | 0.814 | 0.896 | 0.2% | 0.984 |
+
+## T1–T3 on the development test split (600 held-out real pages)
 
 | Method | Precision | Recall | F1 | FPR | ROC-AUC |
 |---|---|---|---|---|---|
@@ -69,6 +80,9 @@ All 2000 evaluation pages are real archived pages. Hand-written fixtures through
 | Safe failure: no model / tampered model | Rules-only mode, no crash | mode=rules_only (test_rules_only_mode_when_no_model); SHA-256 check on load | Pass |
 | Recovery after restart | Data, config and audit chain intact | chain valid after re-init (test_recovery_after_restart) | Pass |
 | Brute force / session fixation / cross-session CSRF | Blocked | 429 / 401 / 403 (tests/test_security.py) | Pass |
+| 80 concurrent requests | Audit chain stays valid | verify = valid (test_audit_chain_survives_concurrent_requests) | Pass |
+| Malformed URL (`http://[::1`) | Validation error, not a crash | 422 INVALID_INPUT (test_malformed_url_is_a_validation_error) | Pass |
+| Corrupt model metadata | Rules-only mode, app keeps running | load_failed (test_corrupt_model_metadata_falls_back_to_rules) | Pass |
 
 ## Performance
 Full decision latency on 300 real test pages: mean **91.56 ms**, median 60.98 ms,

@@ -12,14 +12,16 @@ area**, works on a branch, and opens pull requests. Commits are checked per memb
 Write your name next to a role.
 
 ## A — Backend, data, authentication · owner: ______
-- [x] Password change endpoint + forced change on first login
+- [x] Password change endpoint
+- [ ] Forced password change on first login
 - [ ] Session refresh / "remember me" decision (document it either way)
 - [ ] Pagination totals for `/api/analyses` and `/api/samples`
 - [ ] Sample deletion for admins (soft delete, audited, confirmation)
 - [ ] Backup / restore instructions for `data/` (recovery section of user guide)
 
 ## B — Security engine & evaluation · owner: ______
-- [x] Get the **instructor-approved dataset** and convert it to `pages + labels.csv` (see docs/dataset.md)
+- [x] Real dataset (PhreshPhish) in `pages + labels.csv` format (see docs/dataset.md)
+- [ ] Confirm with the instructor that PhreshPhish is acceptable (or evaluate their approved set with the same scripts)
 - [x] `scripts/evaluate.py`: precision, recall, F1, FPR, confusion matrix, latency (T1–T4) on a held-out set
 - [x] Compare LogisticRegression vs RandomForest; keep the served model explainable
 - [x] False-positive analysis: list FPs, which rules caused them, tune weights (T4)

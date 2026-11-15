@@ -2,9 +2,10 @@
   "repo_url": "https://github.com/Anasnaveed69/phishlens",
   "report_date": "15 November 2026",
   "n_features": 53,
+  "n_features_total": 58,
   "n_rules": 26,
-  "tests_passed": 65,
-  "tests_total": 65,
+  "tests_passed": 71,
+  "tests_total": 71,
   "ci_pythons": "3.11 and 3.12",
   "threats": [
     [
@@ -50,12 +51,12 @@
     [
       "T9",
       "Tampering with audit records (R) \u2014 audit log",
-      "Append-only triggers block UPDATE/DELETE; SHA-256 hash chain detects edits to the DB file; verify endpoint"
+      "Append-only triggers block UPDATE/DELETE; HMAC-SHA256 chain keyed by secrets/audit.key (outside data/) so a copied/edited DB cannot be re-chained; writers serialised (BEGIN IMMEDIATE) so concurrency cannot fork the chain; verify endpoint returns the head hash to keep externally"
     ],
     [
       "T10",
       "Tampered or swapped model file (T/E) \u2014 `models/`",
-      "Model loaded only if SHA-256 matches metadata and feature order matches; otherwise rules-only + logged"
+      "Model loaded only if SHA-256 matches its metadata (and PHISHLENS_MODEL_SHA256 when pinned) and its features exist; any load failure \u2192 rules-only + logged"
     ],
     [
       "T11",
@@ -80,7 +81,7 @@
     [
       "T15",
       "Denial of service via analysis flooding (D) \u2014 analyze endpoints",
-      "30 analyses/min per user, size limits"
+      "30 analyses/min per user incl. each page of a bulk import; uploads run off the event loop; size limits"
     ],
     [
       "T16",
@@ -176,6 +177,21 @@
       "Brute force / session fixation / cross-session CSRF",
       "Blocked",
       "429 / 401 / 403 (tests/test_security.py)"
+    ],
+    [
+      "80 concurrent requests",
+      "Audit chain stays valid",
+      "verify = valid (test_audit_chain_survives_concurrent_requests)"
+    ],
+    [
+      "Malformed URL (http://[::1)",
+      "Validation error, not a crash",
+      "422 INVALID_INPUT (test_malformed_url_is_a_validation_error)"
+    ],
+    [
+      "Corrupt model metadata",
+      "Rules-only mode, app keeps running",
+      "load_failed (test_corrupt_model_metadata_falls_back_to_rules)"
     ]
   ],
   "screens": [

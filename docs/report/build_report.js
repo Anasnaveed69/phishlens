@@ -15,6 +15,8 @@ const R = (p) => path.join(ROOT, p);
 const ev = JSON.parse(fs.readFileSync(R("reports/evaluation.json"), "utf8"));
 const hist = JSON.parse(fs.readFileSync(R("reports/history.json"), "utf8"));
 const facts = JSON.parse(fs.readFileSync(R("docs/report/facts.json"), "utf8"));
+const hold = JSON.parse(fs.readFileSync(R("reports/holdout.json"), "utf8"));
+const hs = hold.results["served@suspicious"], hh = hold.results["served@phishing"];
 
 const FONT = "Times New Roman";
 const PAGE_W = 11906, MARGIN = 1300, CONTENT_W = PAGE_W - 2 * MARGIN; // A4
@@ -141,12 +143,13 @@ body.push(new Paragraph({ children: [new PageBreak()] }));
 body.push(H1("Abstract"));
 body.push(P([
   "PhishLens is a locally deployable web service that scores saved web pages for phishing and explains every decision. ",
-  "Each page is parsed safely (never rendered, executed or fetched), turned into ", B(`${facts.n_features} URL, DOM, text and visual-risk features`),
+  "Each page is parsed safely (never rendered, executed or fetched), turned into ", B(`${facts.n_features_total} URL, DOM, text and visual-risk features`),
+  ` (${facts.n_features} of them used by the served model)`,
   `, checked against ${facts.n_rules} named baseline rules, and scored by a ${ev.served_algorithm === "random_forest" ? "random forest" : "logistic regression"} classifier whose per-feature contributions are exact. `,
   "The service enforces server-side role-based access control, CSRF protection, rate limiting, Argon2id password hashing, strict input validation and a tamper-evident, append-only audit log. ",
-  `On ${ds.test} held-out real pages from the PhreshPhish 2025 dataset, the deployed configuration reaches `,
-  B(`precision ${f3(served.precision)}, recall ${f3(served.recall)} and F1 ${f3(served.f1)}`),
-  ` (false-positive rate ${pct(served.false_positive_rate)}), and ${pct(hi.precision)} precision with a ${pct(hi.false_positive_rate)} false-positive rate in its high-confidence "phishing" band, at a mean decision latency of ${lat.mean_ms} ms. `,
+  `On a fresh holdout of ${hold.dataset.pages} real pages from the PhreshPhish 2025 dataset that were never seen during development, the frozen system reaches `,
+  B(`precision ${f3(hs.precision)}, recall ${f3(hs.recall)} and F1 ${f3(hs.f1)}`),
+  ` (false-positive rate ${pct(hs.false_positive_rate)}), and ${pct(hh.precision)} precision with a ${pct(hh.false_positive_rate)} false-positive rate in its high-confidence "phishing" band, at a mean decision latency of ${hold.latency_ms.mean} ms. `,
   `All ${facts.tests_total} automated tests pass.`,
 ]));
 
@@ -192,7 +195,7 @@ numRef = "num-sequence";
 // 3 Engine
 body.push(H1("3. Security engine"));
 body.push(H2("3.1 Features"));
-body.push(P(`The ${facts.n_features} features (engine/features.py, version ${ev.versions.features}) fall into four groups:`));
+body.push(P(`engine/features.py (version ${ev.versions.features}) extracts ${facts.n_features_total} numeric features in four groups; the served model uses ${facts.n_features} of them (the five pure page-size features are left out, see §6.2):`));
 body.push(...table(["Group", "Examples"], [
   ["URL", "length, dots, subdomains, IP host, '@', hyphens, HTTPS, suspicious tokens, punycode, abused TLD, port, look-alike/misspelled brand in host, brand in an unrelated host, free hosting platform, link shortener, host entropy, digits, query length"],
   ["DOM", "forms, password/email/hidden inputs, form posting to another domain or to an IP, empty/javascript: actions, iframes (hidden, excluding known analytics frames), external link/script/resource ratios, dead links, meta refresh, obfuscation calls, right-click blocking, data:/blob: documents"],
@@ -221,10 +224,10 @@ body.push(...table(["Control", "Implementation", "Evidence"], [
   ["Sessions", "256-bit random token in HttpOnly, SameSite=Strict cookie; only SHA-256 stored; 30-min expiry; killed on logout, role change, disable and password change", "test_session_cookie_flags, test_logout_invalidates_session, test_forged_or_fixated_session_rejected"],
   ["CSRF", "Per-session token required in X-CSRF-Token for every state-changing request", "test_csrf_required_on_state_change, test_csrf_token_from_other_session_rejected"],
   ["Authorization", "Server-side permission per route; least privilege; viewer gets a restricted projection; denials return a generic message and are logged", "test_viewer_cannot_upload_and_is_logged, test_analyst_cannot_access_admin, test_viewer_cannot_export_or_read_raw_samples"],
-  ["Rate limiting", "Login 5/min per IP+user (applied before the password check); analysis 30/min per user; password change limited", "test_login_rate_limited, test_brute_force_locks_out_even_correct_password"],
+  ["Rate limiting", "Login 5/min per IP+user and 20/min per IP across users (spraying), applied before the password check; 30 analyses/min per user, bulk imports counted page by page", "test_login_rate_limited, test_brute_force_locks_out_even_correct_password, test_import_with_analysis_respects_rate_limit"],
   ["Input validation", "Extension, size (read with a hard cap), binary/HTML sniffing, URL scheme/length, label values; zip read in memory with path components dropped, declared and actual size limits and a file-count limit", "test_malformed_and_oversized_input_rejected, test_zip_slip_and_labels, test_zip_bomb_declared_size_rejected"],
   ["Injection", "Parameterized SQL only; LIKE wildcards escaped; CSV formula prefixing; textContent + strict CSP against stored XSS", "test_sql_injection_in_filters_is_inert, test_csv_formula_injection_neutralised, test_xss_payload_is_only_data"],
-  ["Audit", "Append-only (DB triggers block UPDATE/DELETE) and hash-chained; secrets and e-mails redacted; verify endpoint", "test_audit_chain_valid_and_append_only, test_audit_redacts_secrets"],
+  ["Audit", "Append-only (DB triggers block UPDATE/DELETE); HMAC chain with a key outside the data folder; writers serialised so concurrent requests cannot fork the chain; secrets and e-mails redacted; verify endpoint returns the chain head", "test_audit_chain_valid_and_append_only, test_audit_chain_survives_concurrent_requests, test_audit_chain_is_keyed, test_audit_redacts_secrets"],
   ["Safe errors", "Stable error codes, generic messages, stack traces only in server logs with a reference id", "test_errors_never_leak_internals"],
   ["Config changes", "Versioned with reason + explicit confirmation; each analysis stores its config version", "test_admin_threshold_change_is_traceable"],
 ], [2, 6, 4], "Security controls and the tests that prove them", { leftAll: true, size: 17 }));
@@ -238,17 +241,27 @@ body.push(H1("5. Dataset and evaluation method"));
 body.push(P([
   "We evaluated on real, archived pages from ", B("PhreshPhish"), " (Dalton et al., 2025; CC BY 4.0, released for anti-phishing research), which pairs URLs with HTML captured by a real browser. ",
   `A seeded script (scripts/fetch_phreshphish.py) streamed a balanced sample of ${ds.pages} English pages (${ds.phishing} phishing, ${ds.benign} benign) from the official test split, removed exact duplicates and pages over 1 MB, and stored them as text. Pages were never opened in a browser and no URL was visited. `,
-  `The sample was split ${ds.train}/${ds.test} (stratified, seed ${ds.seed}). All tuning used 5-fold cross-validation inside the training part; the ${ds.test} test pages were scored once.`,
+  `The sample was split ${ds.train}/${ds.test} (stratified, seed ${ds.seed}). Model choice, ML weight and thresholds were tuned with 5-fold cross-validation inside the training part only. `,
+  "However, the rule and feature design was iterated using error analysis on development runs that included these test pages, so the test-split numbers in §6.1–6.2 are ", B("development estimates"), " and may be optimistic. ",
+  `For an unbiased final measurement we therefore froze the whole system (features, rules, model, thresholds) and scored a `, B(`fresh holdout of ${hold.dataset.pages} pages`),
+  ` (${hold.dataset.phishing} phishing / ${hold.dataset.benign} benign) streamed from PhreshPhish with a different seed, explicitly excluding all ${ds.pages} development pages (§6.0).`,
 ]));
 body.push(P([I("Note: "), "the brief asks for instructor-approved archived samples. PhreshPhish is a public, peer-reviewed research dataset; the pipeline accepts any dataset in the same pages + labels.csv format, so a different approved set can be evaluated with the same command."]));
 
 // 6 Results
 body.push(H1("6. Results"));
-body.push(H2("6.1 T1–T3: precision, recall and F1"));
+body.push(H2("6.0 Final result: fresh, unseen holdout"));
+body.push(P(`Nothing was changed after these ${hold.dataset.pages} pages were downloaded: the shipped model ${hold.model_version} and its configuration (weight ${hold.config.ml_weight}, suspicious ≥ ${hold.config.suspicious_threshold}, phishing ≥ ${hold.config.phishing_threshold}) were applied as-is (scripts/evaluate_frozen.py → reports/holdout.json).`));
+body.push(...table(["Band", "Precision", "Recall", "F1", "FPR", "ROC-AUC", "TP", "FP", "FN", "TN"],
+  [["Flag for review (suspicious + phishing)", hs], ["High-confidence phishing", hh]].map(([n, m]) => [n, f3(m.precision), f3(m.recall), f3(m.f1), pct(m.false_positive_rate), f3(m.roc_auc),
+    m.confusion_matrix.tp, m.confusion_matrix.fp, m.confusion_matrix.fn, m.confusion_matrix.tn]),
+  [4, 1.4, 1.3, 1.2, 1.2, 1.4, 0.8, 0.8, 0.8, 0.8], `Fresh holdout (${hold.dataset.pages} unseen real pages) — the headline result`, { size: 17 }));
+body.push(P(`Compared with the development test split (F1 ${f3(served.f1)}), the holdout F1 is ${f3(hs.f1)}${hs.f1 < served.f1 ? ", i.e. the development estimate was slightly optimistic, as expected" : ", confirming the development estimate"}. Mean latency on the holdout: ${hold.latency_ms.mean} ms (p95 ${hold.latency_ms.p95} ms).`));
+body.push(H2("6.1 T1–T3 on the development test split (model comparison)"));
 body.push(...table(["Method", "Precision", "Recall", "F1", "FPR", "ROC-AUC", "TP", "FP", "FN", "TN"],
   Object.entries(res).map(([k, m]) => [methodLabel[k] || k, f3(m.precision), f3(m.recall), f3(m.f1), pct(m.false_positive_rate),
     f3(m.roc_auc), m.confusion_matrix.tp, m.confusion_matrix.fp, m.confusion_matrix.fn, m.confusion_matrix.tn]),
-  [4, 1.4, 1.3, 1.2, 1.2, 1.4, 0.8, 0.8, 0.8, 0.8], `Held-out test set (${ds.test} real pages). FPR = false-positive rate on benign pages.`,
+  [4, 1.4, 1.3, 1.2, 1.2, 1.4, 0.8, 0.8, 0.8, 0.8], `Development test split (${ds.test} real pages). "Untuned hybrid" = today's rules with the hand-set starter configuration. FPR = false-positive rate on benign pages.`,
   { size: 17, highlight: (r) => String(r[0]).startsWith("PhishLens") }));
 body.push(P([
   "The served configuration flags ", B(`${cmS.tp} of ${cmS.tp + cmS.fn} phishing pages`), ` (recall ${pct(served.recall)}) while flagging ${cmS.fp} of ${cmS.fp + cmS.tn} benign pages (${pct(served.false_positive_rate)}). `,
@@ -259,7 +272,7 @@ body.push(...image("reports/roc_pr.png", 600, "ROC and precision–recall curves
 body.push(...image("reports/confusion_matrix.png", 300, "Confusion matrix of the served configuration (suspicious threshold)"));
 
 body.push(H2("6.2 T4: false-positive analysis and how it changed the system"));
-body.push(P("False-positive analysis was not a one-off: each round of errors on real data changed the engine. Table " + (tabNo + 1) + " shows the three iterations, all measured on the same test split."));
+body.push(P("False-positive analysis was not a one-off: each round of errors on real data changed the engine. Table " + (tabNo + 1) + " shows the iterations on the same development split; values were recorded from each run's output (only the final run's full artifacts are kept in reports/). Row 1.1 used the original rules-1.1, which is why it differs from the 'untuned hybrid' row of Table 7."));
 body.push(...table(["Version", "What changed (from the error analysis)", "F1", "Precision", "Recall", "FPR"],
   hist.iterations.map((h) => [h.version, h.change, f3(h.f1), f3(h.precision), f3(h.recall), pct(h.fpr)]),
   [1.4, 7, 1, 1.2, 1.1, 1], "Engine iterations driven by false-positive / false-negative analysis", { size: 17 }));
@@ -276,7 +289,7 @@ body.push(P([`The final error list (reports/errors.csv) contains ${ev.errors.fal
 body.push(...image("reports/rule_coverage.png", 560, "How often each rule fires on phishing vs benign pages"));
 
 body.push(H2("6.3 T5: benign pages and archived samples"));
-body.push(P(`Every page in the evaluation is a real archived page (T5). In addition, ${facts.fixture_pages} hand-written fixtures cover specific cases with expected results:`));
+body.push(P(`Every page in both evaluations is a real archived page (T5). In addition, ${facts.fixture_pages} hand-written fixtures cover specific cases. benign_bank_portal.html was added after the ablation as a realistic, full-size version of the minimal benign_bank_login.html (real sign-in pages carry navigation, scripts and help text); both are kept so the limitation stays visible:`));
 body.push(...table(["Input", "Expected", "Actual", "Evidence", "Result"], facts.fixture_results.map((r) => [r.file, r.expected, r.actual, r.evidence, r.pass ? "Pass" : "Fail"]),
   [3.5, 1.4, 1.4, 5, 1], "Fixture pages run through the deployed configuration", { size: 17 }));
 
@@ -291,7 +304,7 @@ body.push(P(`Full decision latency (parse → features → rules → model → d
 
 // 7 Demo / UI
 body.push(H1("7. Demonstration"));
-body.push(P("The illustrative scenario from the brief is scripted end to end (scripts/record_demo.py) and recorded as a captioned video (dist/demo/phishlens_demo.mp4). Selected frames:"));
+body.push(P("The illustrative scenario from the brief is scripted end to end (scripts/record_demo.py) and recorded as an 83-second captioned walkthrough (docs/demo/phishlens_demo.mp4). The 10–15 minute live demonstration follows the step-by-step script in the README. Selected frames:"));
 facts.screens.forEach((s) => body.push(...image(s.file, 470, s.caption)));
 
 // 8 Limitations, ethics, conclusion
@@ -299,10 +312,10 @@ body.push(H1("8. Limitations"));
 [
   "Static analysis only: content generated entirely by JavaScript at run time, or cloaked pages that show different HTML to scanners, can be missed. Not executing pages is a deliberate safety trade-off.",
   "Visual-risk features are derived from markup; there is no screenshot or logo-image similarity.",
-  `The evaluation uses a ${ds.pages}-page sample of one dataset collected in 2024–2025; performance on other time periods, languages or targeted (spear-) phishing may differ.`,
+  `The evaluation uses ${ds.pages} development pages and a ${hold.dataset.pages}-page fresh holdout from one dataset collected in 2024–2025; performance on other time periods, languages or targeted (spear-) phishing may differ. PhreshPhish is a public research dataset, not one specifically approved by the instructor.`,
   "Brand, free-hosting and abused-TLD lists are fixed in code and need maintenance; domain parsing approximates the public suffix list to avoid network access.",
-  "The rate limiter is in-memory and per process; the local demo runs over HTTP (cookies become Secure when PHISHLENS_COOKIE_SECURE=1 behind TLS).",
-  "Someone with operating-system access can still replace files; the audit hash chain detects edits but cannot prevent them.",
+  "The rate limiter is in-memory and per process, and keyed on IP: on a shared machine all users share 127.0.0.1, so repeated bad logins can temporarily lock an account (a deliberate trade-off against brute force). The local demo runs over HTTP (cookies become Secure when PHISHLENS_COOKIE_SECURE=1 behind TLS).",
+  "The audit chain is keyed (HMAC) with a secret stored outside the data folder, so a copy of the database alone cannot be re-chained; an attacker holding both the key and the database could still rewrite it, and deleting the newest rows is only detectable against an externally kept copy of the chain head (returned by the verify endpoint). Likewise, someone who can replace both the model file and its metadata can swap the model unless PHISHLENS_MODEL_SHA256 pins it.",
 ].forEach((t) => body.push(bullet(t)));
 body.push(H1("9. Ethics statement"));
 [
@@ -313,7 +326,7 @@ body.push(H1("9. Ethics statement"));
   "Data is minimised: exports omit page content, logs are redacted, passwords are hashed and session tokens are stored only as hashes.",
 ].forEach((t) => body.push(bullet(t)));
 body.push(H1("10. Conclusion"));
-body.push(P(`PhishLens meets the six functional requirements and the security requirements of the brief as a working, locally runnable system. Its main lesson came from real data: rules written for classic phishing kits caught few modern pages and fired on many benign ones, while error analysis on PhreshPhish revealed the patterns that matter today — free hosting platforms, brand names and misspellings in hosts, and wallet seed-phrase requests. Feeding those findings back raised F1 from ${f3(hist.iterations[0].f1)} to ${f3(served.f1)} while every decision stays explainable and reproducible.`));
+body.push(P(`PhishLens meets the six functional requirements and the security requirements of the brief as a working, locally runnable system. Its main lesson came from real data: rules written for classic phishing kits caught few modern pages and fired on many benign ones, while error analysis on PhreshPhish revealed the patterns that matter today — free hosting platforms, brand names and misspellings in hosts, and wallet seed-phrase requests. Feeding those findings back raised development F1 from ${f3(hist.iterations[0].f1)} to ${f3(served.f1)}, and the frozen system scored F1 ${f3(hs.f1)} with ${pct(hh.precision)} high-confidence precision on ${hold.dataset.pages} pages it had never seen, while every decision stays explainable and reproducible. An independent review of the finished system found no critical defects; the issues it did find (audit chain under concurrency, unkeyed hash, import rate limit, malformed-URL handling) were fixed and covered by regression tests.`));
 body.push(H1("References"));
 numRef = "num-refs";
 [

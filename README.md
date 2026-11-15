@@ -16,16 +16,17 @@ Pages are only parsed — never rendered, executed or fetched.
 
 ## Results on real phishing data
 
-600 held-out real pages from the PhreshPhish 2025 research dataset (never used for any tuning):
+**Final, unseen holdout:** 1000 real pages from the PhreshPhish 2025 research dataset that were never
+looked at during development, scored by the frozen model and settings ([reports/holdout.md](reports/holdout.md)):
 
 | | Precision | Recall | F1 | False-positive rate |
 |---|---|---|---|---|
-| PhishLens — flag for review (suspicious + phishing) | 0.936 | 0.883 | **0.909** | 6.0% |
-| PhishLens — high-confidence phishing only | **0.976** | 0.807 | 0.883 | **2.0%** |
-| Rules alone | 0.883 | 0.327 | 0.477 | 4.3% |
+| PhishLens — flag for review (suspicious + phishing) | 0.964 | 0.904 | **0.933** | 3.4% |
+| PhishLens — high-confidence phishing only | **0.998** | 0.814 | 0.896 | **0.2%** |
 
-Mean decision latency 91.56 ms · 65/65 automated tests passing.
-Details, charts and the false-positive analysis: [reports/evaluation.md](reports/evaluation.md) · [docs/test-plan.md](docs/test-plan.md).
+Development split (600 pages, used during rule design, so an optimistic estimate): F1 0.909;
+rules alone F1 0.477. Mean decision latency 93.84 ms · 71/71 automated tests passing.
+Model comparison, charts and the false-positive analysis: [reports/evaluation.md](reports/evaluation.md) · [docs/test-plan.md](docs/test-plan.md).
 
 ## Quick start (VS Code, any laptop)
 
@@ -44,7 +45,7 @@ thresholds are applied automatically on first start. Run the tests with `pytest 
 ## Demo (10–15 min)
 
 A captioned recording of the whole scenario is produced by `python scripts/record_demo.py ...`
-(see [docs/demo/phishlens_demo.mp4](docs/demo/phishlens_demo.mp4)). To present it live:
+(83-second captioned walkthrough: [docs/demo/phishlens_demo.mp4](docs/demo/phishlens_demo.mp4)). For the 10–15 minute live demo:
 
 1. **analyst** → Analyze `fixtures/tests/benign_bank_portal.html`, URL `https://www.hbl.com/ib/login` → *benign*, no rule fired.
 2. Analyze `fixtures/tests/phish_brand_clone.html`, URL `http://paypal-secure-verify.tk/webscr/signin` → *phishing*
@@ -62,6 +63,10 @@ A captioned recording of the whole scenario is produced by `python scripts/recor
 pip install datasets
 python scripts/fetch_phreshphish.py --per-class 1000                       # 2,000 real pages (~74 MB)
 python scripts/evaluate.py --data phreshphish_sample --drop-size-features  # metrics, charts, model
+
+# fresh holdout, excluding every development page, scored by the frozen model:
+python scripts/fetch_phreshphish.py --per-class 500 --seed 7 --out phreshphish_holdout --exclude-dir phreshphish_sample
+python scripts/evaluate_frozen.py --data phreshphish_holdout
 ```
 Without downloading the pages, `python scripts/train_from_features.py` rebuilds the shipped model from
 `reports/features.csv` and checks it against the recorded test predictions.

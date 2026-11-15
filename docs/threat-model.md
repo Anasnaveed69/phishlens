@@ -22,16 +22,18 @@ configuration (thresholds/rules), the trained model file, and the audit log.
 | T6 | **Malicious page executes / beacons out** (I/E) | feature extraction | Pure-Python parser, no rendering, no JS engine, no network requests; declared URL is parsed, never fetched | `test_scripts_are_not_executed` |
 | T7 | **Unsafe file handling: zip slip, zip bomb, huge uploads** (D/T) | upload & import | Extension + content sniffing, size cap read with `read(limit+1)`, archive read in memory only, archive paths discarded, declared and actual expanded size limits, file-count limit, server-generated storage names | `test_zip_slip_and_labels`, `test_zip_bomb_declared_size_rejected`, `test_malformed_and_oversized_input_rejected`, `test_zip_with_too_many_files_rejected`, `test_oversized_fields_rejected` |
 | T8 | **SQL injection** (T/I) | repository | Only parameterized queries; filter column names are fixed in code; LIKE wildcards escaped | `test_sql_injection_in_filters_is_inert` |
-| T9 | **Tampering with audit records** (R) | audit log | Append-only triggers block UPDATE/DELETE; SHA-256 hash chain detects edits to the DB file; verify endpoint | `test_audit_chain_valid_and_append_only` |
-| T10 | **Tampered or swapped model file** (T/E) | `models/` | Model loaded only if SHA-256 matches metadata and feature order matches; otherwise rules-only + logged | model status in Admin → Model |
+| T9 | **Tampering with audit records** (R) | audit log | Append-only triggers block UPDATE/DELETE; HMAC-SHA256 chain keyed by `secrets/audit.key` (outside `data/`) so a copied/edited DB cannot be re-chained; writers serialised (`BEGIN IMMEDIATE`) so concurrency cannot fork the chain; verify endpoint returns the head hash to keep externally | `test_audit_chain_valid_and_append_only`, `test_audit_chain_survives_concurrent_requests`, `test_audit_chain_is_keyed` |
+| T10 | **Tampered or swapped model file** (T/E) | `models/` | Model loaded only if SHA-256 matches its metadata (and `PHISHLENS_MODEL_SHA256` when pinned) and its features exist; any load failure → rules-only + logged | `test_corrupt_model_metadata_falls_back_to_rules`, Admin → Model |
 | T11 | **Sensitive data leaking into logs/reports** (I) | audit, export | Recursive redaction of secret-like keys, e-mail masking, string truncation; exports exclude raw HTML and feature dumps | `test_audit_redacts_secrets`, export test |
 | T12 | **Error messages leaking internals** (I) | all | Stable error codes, generic messages, stack traces logged server-side only with a reference id | `test_errors_never_leak_internals` |
 | T13 | **CSV/formula injection in exports** (T) | CSV export | Cells starting with `= + - @` are prefixed with `'` | `test_csv_formula_injection_neutralised` |
 | T14 | **Unreviewed config change silently alters decisions** (R/T) | admin config | Versioned config with reason, explicit confirmation, audit entry with before/after, each analysis stores its config version | `test_admin_threshold_change_is_traceable` |
-| T15 | **Denial of service via analysis flooding** (D) | analyze endpoints | 30 analyses/min per user, size limits | config `PHISHLENS_ANALYZE_RATE` |
+| T15 | **Denial of service via analysis flooding** (D) | analyze endpoints | 30 analyses/min per user incl. each page of a bulk import; uploads run off the event loop; size limits | `test_import_with_analysis_respects_rate_limit` |
 
 | T16 | **Model learns a dataset shortcut** (T, integrity of decisions) | ML model | Explanations expose it (page-size features dominated small benign pages); size-feature ablation evaluated; brand-ownership feature; fixtures checked as a generalisation test | `reports/evaluation.md`, report §6.2 |
 
 ## Residual risks
-See [limitations-ethics.md](limitations-ethics.md): single-process rate limiter, local HTTP
-(no TLS) in the demo, admin with OS access can still replace files, synthetic data bias.
+See [limitations-ethics.md](limitations-ethics.md): single-process, IP-keyed rate limiter (shared IP can lock
+an account), local HTTP (no TLS) in the demo, someone holding both the audit key and the DB (or the model and its
+metadata, without a pinned hash) can still rewrite them, tail truncation needs an external copy of the chain head.
+An independent review (Nov 2026) found no critical issues; its medium/low findings are fixed and regression-tested.
