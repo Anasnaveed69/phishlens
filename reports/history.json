@@ -1,0 +1,71 @@
+{
+  "note": "All rows: same PhreshPhish 2,000-page sample, same stratified split (seed 42), 600 held-out test pages, decision flagged at the suspicious threshold. Values copied from the evaluate.py output of each run.",
+  "iterations": [
+    {
+      "version": "1.1",
+      "change": "Starter: 20 rules written for classic phishing kits, logistic regression, hand-set weight 0.6 / threshold 0.4",
+      "f1": 0.8325,
+      "precision": 0.8638,
+      "recall": 0.8033,
+      "fpr": 0.1267
+    },
+    {
+      "version": "2.0",
+      "change": "Error analysis: free-hosting, shortener, brand-in-host, brand-typo, wallet-seed rules and features; tracker iframes ignored; random forest chosen by CV; weight and thresholds calibrated on training folds",
+      "f1": 0.9246,
+      "precision": 0.9293,
+      "recall": 0.92,
+      "fpr": 0.07
+    },
+    {
+      "version": "2.1",
+      "change": "Rule-coverage analysis: R06/R07/R17 only count on login pages, R12 only for hot-linked brand logos (cut benign firing from 56\u201359% to \u22644%)",
+      "f1": 0.9272,
+      "precision": 0.9416,
+      "recall": 0.9133,
+      "fpr": 0.0567
+    },
+    {
+      "version": "2.2 (all features)",
+      "change": "Brand-ownership feature added; explanations showed page-size features dominating small benign pages",
+      "f1": 0.9277,
+      "precision": 0.9356,
+      "recall": 0.92,
+      "fpr": 0.0633
+    },
+    {
+      "version": "2.2 served",
+      "change": "Same, trained without the 5 pure page-size features (equal CV F1 0.933 vs 0.931, better on unseen small pages)",
+      "f1": 0.9091,
+      "precision": 0.9364,
+      "recall": 0.8833,
+      "fpr": 0.06
+    }
+  ],
+  "findings": [
+    "Rules written for old phishing kits barely fire on modern phishing: in the first run, rules alone reached F1 0.36, and R06 (hidden iframe) fired on 64% of benign pages because analytics/consent frames are invisible iframes.",
+    "Modern phishing is concentrated on free hosting and developer platforms (pages.dev, vercel.app, blogspot, storage buckets): R21 fires on 52.5% of phishing pages and 0.1% of benign pages.",
+    "Crypto-wallet phishing is common: a request for a seed/recovery phrase (R25) fires on 16.3% of phishing pages with 0.98 precision; misspelled brands in hosts (trzor, liive) are caught by R24.",
+    "Tightening noisy rules raised rules-only precision from 0.44 to 0.88 and cut their false-positive rate from 38% to 4%.",
+    "The explanation panel exposed a dataset shortcut: benign pages in the data are large sites (median 119 links, 35 scripts) while phishing pages are small, so the first model flagged any tiny page. Removing the pure page-size features kept cross-validated F1 (0.933 vs 0.931) and made more hand-written small benign pages pass, at a cost of 1.9 F1 points on this test split; we chose robustness and report both.",
+    "Remaining known false positives: minimal pages on ordinary domains with hyphenated hosts and no navigation (the two edge fixtures), and small single-page apps; analysts see them as 'suspicious' or 'phishing' with the contributing features listed."
+  ],
+  "ablation": {
+    "all_features": {
+      "cv_f1": 0.9313,
+      "test_f1": 0.9277,
+      "precision": 0.9356,
+      "recall": 0.92,
+      "fpr": 0.0633,
+      "fixtures_pass": "2/6"
+    },
+    "no_size_features": {
+      "cv_f1": 0.9328,
+      "test_f1": 0.9091,
+      "precision": 0.9364,
+      "recall": 0.8833,
+      "fpr": 0.06,
+      "fixtures_pass": "3/6"
+    }
+  }
+}

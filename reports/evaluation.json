@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-15T12:22:43+00:00",
+  "generated_at": "2026-11-15T12:34:03+00:00",
   "dataset": {
     "path": "phreshphish_sample",
     "name": "PhreshPhish-2000",
@@ -13,7 +13,7 @@
     "seed": 42
   },
   "versions": {
-    "features": "features-2.1",
+    "features": "features-2.2",
     "rules": "rules-2.1"
   },
   "config_default": {
@@ -23,22 +23,153 @@
     "disabled_rules": []
   },
   "config": {
-    "phishing_threshold": 0.48,
-    "suspicious_threshold": 0.36,
-    "ml_weight": 0.7,
+    "phishing_threshold": 0.54,
+    "suspicious_threshold": 0.42,
+    "ml_weight": 0.8,
     "disabled_rules": []
   },
   "cross_validation": {
     "logistic_regression": {
-      "oof_f1@0.5": 0.91,
-      "oof_roc_auc": 0.9738
+      "oof_f1@0.5": 0.8996,
+      "oof_roc_auc": 0.9654
     },
     "random_forest": {
-      "oof_f1@0.5": 0.9324,
-      "oof_roc_auc": 0.9834
+      "oof_f1@0.5": 0.9328,
+      "oof_roc_auc": 0.9793
     }
   },
   "served_algorithm": "random_forest",
+  "feature_order": [
+    "url_length",
+    "num_dots",
+    "num_subdomains",
+    "has_ip_host",
+    "has_at_symbol",
+    "hyphens_in_host",
+    "uses_https",
+    "suspicious_url_tokens",
+    "has_punycode",
+    "suspicious_tld",
+    "path_depth",
+    "has_port",
+    "num_forms",
+    "num_password_inputs",
+    "external_form_action",
+    "empty_or_js_form_action",
+    "num_iframes",
+    "hidden_iframes",
+    "external_link_ratio",
+    "null_link_ratio",
+    "external_script_ratio",
+    "has_meta_refresh",
+    "obfuscation_hits",
+    "disables_right_click",
+    "brand_mentions",
+    "brand_domain_mismatch",
+    "urgency_terms",
+    "credential_terms",
+    "external_favicon",
+    "external_logo",
+    "title_brand_mismatch",
+    "hidden_elements",
+    "form_action_ip",
+    "data_uri_count",
+    "lookalike_brand_host",
+    "brand_in_subdomain",
+    "minimal_login_page",
+    "free_hosting",
+    "url_shortener",
+    "brand_in_host",
+    "brand_typo_host",
+    "host_entropy",
+    "digits_in_host",
+    "query_length",
+    "num_inputs",
+    "hidden_inputs",
+    "email_inputs",
+    "login_terms",
+    "external_resource_ratio",
+    "tracker_iframes",
+    "brand_asset_hotlink",
+    "wallet_seed_request",
+    "claimed_brand_owned"
+  ],
+  "dropped_size_features": true,
+  "fixtures": [
+    {
+      "file": "benign_article.html",
+      "expected": "benign",
+      "actual": "benign",
+      "score": 0.2534,
+      "ml": 0.3168,
+      "rules": [],
+      "pass": true
+    },
+    {
+      "file": "benign_bank_login.html",
+      "expected": "benign",
+      "actual": "suspicious",
+      "score": 0.5018,
+      "ml": 0.6272,
+      "rules": [],
+      "pass": false
+    },
+    {
+      "file": "phish_brand_clone.html",
+      "expected": "phishing",
+      "actual": "phishing",
+      "score": 0.7986,
+      "ml": 0.7511,
+      "rules": [
+        "R03",
+        "R04",
+        "R05",
+        "R06",
+        "R08",
+        "R11",
+        "R12",
+        "R13",
+        "R15",
+        "R23"
+      ],
+      "pass": true
+    },
+    {
+      "file": "phish_ip_host.html",
+      "expected": "phishing",
+      "actual": "phishing",
+      "score": 0.6264,
+      "ml": 0.5469,
+      "rules": [
+        "R01",
+        "R04",
+        "R05",
+        "R07",
+        "R11",
+        "R13",
+        "R20"
+      ],
+      "pass": true
+    },
+    {
+      "file": "edge_brand_mention_article.html",
+      "expected": "benign",
+      "actual": "phishing",
+      "score": 0.6191,
+      "ml": 0.7739,
+      "rules": [],
+      "pass": false
+    },
+    {
+      "file": "edge_malformed.html",
+      "expected": "benign",
+      "actual": "phishing",
+      "score": 0.6182,
+      "ml": 0.7728,
+      "rules": [],
+      "pass": false
+    }
+  ],
   "results": {
     "rules_only@0.40": {
       "accuracy": 0.6417,
@@ -55,86 +186,86 @@
       "roc_auc": 0.8102
     },
     "logistic_regression@0.5": {
-      "accuracy": 0.8883,
-      "precision": 0.9396,
-      "recall": 0.83,
-      "f1": 0.8814,
-      "false_positive_rate": 0.0533,
+      "accuracy": 0.8867,
+      "precision": 0.9427,
+      "recall": 0.8233,
+      "f1": 0.879,
+      "false_positive_rate": 0.05,
       "confusion_matrix": {
-        "tn": 284,
-        "fp": 16,
-        "fn": 51,
-        "tp": 249
+        "tn": 285,
+        "fp": 15,
+        "fn": 53,
+        "tp": 247
       },
-      "roc_auc": 0.948
+      "roc_auc": 0.9373
     },
     "random_forest@0.5": {
-      "accuracy": 0.9183,
-      "precision": 0.9435,
-      "recall": 0.89,
-      "f1": 0.916,
-      "false_positive_rate": 0.0533,
+      "accuracy": 0.9,
+      "precision": 0.9196,
+      "recall": 0.8767,
+      "f1": 0.8976,
+      "false_positive_rate": 0.0767,
       "confusion_matrix": {
-        "tn": 284,
-        "fp": 16,
-        "fn": 33,
-        "tp": 267
+        "tn": 277,
+        "fp": 23,
+        "fn": 37,
+        "tp": 263
       },
-      "roc_auc": 0.9764
+      "roc_auc": 0.9721
     },
     "hybrid_untuned@0.40 (LR, w=0.6)": {
-      "accuracy": 0.8867,
-      "precision": 0.9603,
-      "recall": 0.8067,
-      "f1": 0.8768,
-      "false_positive_rate": 0.0333,
+      "accuracy": 0.8783,
+      "precision": 0.9522,
+      "recall": 0.7967,
+      "f1": 0.8675,
+      "false_positive_rate": 0.04,
       "confusion_matrix": {
-        "tn": 290,
-        "fp": 10,
+        "tn": 288,
+        "fp": 12,
+        "fn": 61,
+        "tp": 239
+      },
+      "roc_auc": 0.9428
+    },
+    "served@suspicious": {
+      "accuracy": 0.9117,
+      "precision": 0.9364,
+      "recall": 0.8833,
+      "f1": 0.9091,
+      "false_positive_rate": 0.06,
+      "confusion_matrix": {
+        "tn": 282,
+        "fp": 18,
+        "fn": 35,
+        "tp": 265
+      },
+      "roc_auc": 0.9743
+    },
+    "served@phishing": {
+      "accuracy": 0.8933,
+      "precision": 0.9758,
+      "recall": 0.8067,
+      "f1": 0.8832,
+      "false_positive_rate": 0.02,
+      "confusion_matrix": {
+        "tn": 294,
+        "fp": 6,
         "fn": 58,
         "tp": 242
       },
-      "roc_auc": 0.9516
-    },
-    "served@suspicious": {
-      "accuracy": 0.9283,
-      "precision": 0.9416,
-      "recall": 0.9133,
-      "f1": 0.9272,
-      "false_positive_rate": 0.0567,
-      "confusion_matrix": {
-        "tn": 283,
-        "fp": 17,
-        "fn": 26,
-        "tp": 274
-      },
-      "roc_auc": 0.9775
-    },
-    "served@phishing": {
-      "accuracy": 0.8967,
-      "precision": 0.9798,
-      "recall": 0.81,
-      "f1": 0.8869,
-      "false_positive_rate": 0.0167,
-      "confusion_matrix": {
-        "tn": 295,
-        "fp": 5,
-        "fn": 57,
-        "tp": 243
-      },
-      "roc_auc": 0.9775
+      "roc_auc": 0.9743
     }
   },
   "latency_full_pipeline": {
     "pages_timed": 300,
-    "mean_ms": 88.19,
-    "median_ms": 61.54,
-    "p95_ms": 249.03,
-    "max_ms": 679.43
+    "mean_ms": 91.56,
+    "median_ms": 60.98,
+    "p95_ms": 245.04,
+    "max_ms": 715.17
   },
   "feature_extraction_ms": {
-    "mean": 61.21,
-    "p95": 204.61
+    "mean": 63.49,
+    "p95": 215.0
   },
   "rule_coverage": [
     {
@@ -347,16 +478,15 @@
     }
   ],
   "errors": {
-    "false_positives": 17,
-    "false_negatives": 26,
+    "false_positives": 18,
+    "false_negatives": 35,
     "rules_in_false_positives": {
       "R05": 2,
-      "R20": 2,
-      "R11": 2,
+      "R15": 2,
       "R21": 1,
       "R26": 1,
-      "R15": 1,
-      "R06": 1,
+      "R20": 1,
+      "R11": 1,
       "R13": 1,
       "R09": 1
     }
@@ -364,102 +494,102 @@
   "top_features_lr": [
     {
       "feature": "free_hosting",
-      "coef": 2.798
+      "coef": 2.804
     },
     {
       "feature": "query_length",
-      "coef": 1.568
-    },
-    {
-      "feature": "num_subdomains",
-      "coef": -1.507
+      "coef": 1.846
     },
     {
       "feature": "suspicious_tld",
-      "coef": 1.416
+      "coef": 1.296
     },
     {
       "feature": "hidden_iframes",
-      "coef": -1.26
+      "coef": -1.181
+    },
+    {
+      "feature": "num_subdomains",
+      "coef": -1.166
     },
     {
       "feature": "hyphens_in_host",
-      "coef": 1.037
+      "coef": 1.02
     },
     {
       "feature": "url_length",
-      "coef": 0.987
-    },
-    {
-      "feature": "html_length_log",
-      "coef": -0.949
-    },
-    {
-      "feature": "login_terms",
-      "coef": 0.737
-    },
-    {
-      "feature": "title_brand_mismatch",
-      "coef": 0.669
+      "coef": 0.997
     },
     {
       "feature": "uses_https",
-      "coef": -0.668
+      "coef": -0.698
     },
     {
-      "feature": "num_dots",
-      "coef": 0.657
+      "feature": "num_forms",
+      "coef": -0.696
+    },
+    {
+      "feature": "title_brand_mismatch",
+      "coef": 0.605
+    },
+    {
+      "feature": "digits_in_host",
+      "coef": 0.589
+    },
+    {
+      "feature": "host_entropy",
+      "coef": 0.538
     }
   ],
   "top_features_rf": [
     {
       "feature": "path_depth",
-      "importance": 0.1001
+      "importance": 0.1172
     },
     {
       "feature": "free_hosting",
-      "importance": 0.0977
-    },
-    {
-      "feature": "num_links",
-      "importance": 0.0858
-    },
-    {
-      "feature": "html_length_log",
-      "importance": 0.0802
-    },
-    {
-      "feature": "num_scripts",
-      "importance": 0.0609
-    },
-    {
-      "feature": "text_length_log",
-      "importance": 0.0609
-    },
-    {
-      "feature": "url_length",
-      "importance": 0.0507
-    },
-    {
-      "feature": "hidden_iframes",
-      "importance": 0.0419
-    },
-    {
-      "feature": "external_link_ratio",
-      "importance": 0.0392
+      "importance": 0.1115
     },
     {
       "feature": "external_resource_ratio",
-      "importance": 0.0387
+      "importance": 0.0718
     },
     {
-      "feature": "host_entropy",
-      "importance": 0.0338
+      "feature": "external_link_ratio",
+      "importance": 0.0681
+    },
+    {
+      "feature": "url_length",
+      "importance": 0.068
+    },
+    {
+      "feature": "hidden_iframes",
+      "importance": 0.0621
     },
     {
       "feature": "hidden_elements",
-      "importance": 0.0248
+      "importance": 0.0513
+    },
+    {
+      "feature": "host_entropy",
+      "importance": 0.051
+    },
+    {
+      "feature": "num_inputs",
+      "importance": 0.0332
+    },
+    {
+      "feature": "num_iframes",
+      "importance": 0.0325
+    },
+    {
+      "feature": "query_length",
+      "importance": 0.0304
+    },
+    {
+      "feature": "hyphens_in_host",
+      "importance": 0.0301
     }
   ],
-  "saved_model": "rf-20261115122243"
+  "saved_model": "rf-20261115123403"
 }

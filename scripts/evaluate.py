@@ -350,7 +350,7 @@ def charts(out: Path, yt, p_lr, p_rf, rules, hybrid, pred_h, coverage, top_lr) -
         ax.text(c, r, str(v), ha="center", va="center", fontsize=14, color="white" if v > cm.max() / 2 else "black")
     ax.set_xticks([0, 1], ["benign", "phishing"])
     ax.set_yticks([0, 1], ["benign", "phishing"])
-    ax.set(xlabel="Predicted", ylabel="Actual", title="Served hybrid @ phishing threshold")
+    ax.set(xlabel="Predicted", ylabel="Actual", title="Served config (suspicious threshold)")
     fig.tight_layout()
     fig.savefig(out / "confusion_matrix.png", dpi=150)
     plt.close(fig)

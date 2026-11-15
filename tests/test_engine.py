@@ -171,3 +171,30 @@ def test_form_to_ip_and_data_uri():
             "<iframe src='data:text/html;base64,PGgxPmhpPC9oMT4='></iframe></body></html>")
     fr = extract(html, "https://a.example.com/")
     assert fr.values["form_action_ip"] == 1 and fr.values["data_uri_count"] == 1
+
+
+def test_forest_explanations_are_exact():
+    """bias + sum(contributions) must equal the forest's predicted probability (report §3.3)."""
+    import numpy as np
+    from engine.model import explain_contributions, make_pipeline
+    rng = np.random.default_rng(0)
+    X = rng.normal(size=(300, 6)) * [1, 10, 1, 1, 5, 1]
+    y = (X[:, 0] + X[:, 1] / 10 > 0).astype(int)
+    pipe = make_pipeline("random_forest").fit(X, y)
+    forest = pipe.named_steps["clf"]
+    bias = np.mean([e.tree_.value[0, 0, 1] / e.tree_.value[0, 0].sum() for e in forest.estimators_])
+    for i in range(5):
+        contrib, unit = explain_contributions(pipe, X[i:i + 1])
+        assert unit == "probability"
+        assert abs(bias + contrib.sum() - pipe.predict_proba(X[i:i + 1])[0, 1]) < 1e-9
+
+
+def test_shipped_model_loads_and_explains():
+    from pathlib import Path
+    from engine.model import load
+    root = Path(__file__).resolve().parent.parent
+    model = load(root / "models" / "model.joblib")
+    assert model is not None and model.meta["sha256"]
+    fr = extract(fixture_bytes("phish_brand_clone.html").decode(), "http://paypal-secure-verify.tk/webscr/signin")
+    out = model.predict(fr)
+    assert 0 <= out["probability"] <= 1 and out["top_features"]

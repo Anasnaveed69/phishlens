@@ -1,6 +1,6 @@
 # Evaluation report — PhreshPhish-2000
 
-Generated 2026-11-15T12:22:43+00:00 · features `features-2.1` · rules `rules-2.1` · served model `rf-20261115122243`
+Generated 2026-11-15T12:34:03+00:00 · features `features-2.2` · rules `rules-2.1` · served model `rf-20261115123403`
 
 Dataset: **2000 pages** (1000 phishing, 1000 benign); stratified split 1400 train / 600 test (seed 42).
 
@@ -9,13 +9,13 @@ Dataset: **2000 pages** (1000 phishing, 1000 benign); stratified split 1400 trai
 | Method | Precision | Recall | F1 | Accuracy | FPR | ROC-AUC | TP | FP | FN | TN |
 |---|---|---|---|---|---|---|---|---|---|---|
 | rules_only@0.40 | 0.883 | 0.327 | 0.477 | 0.642 | 0.043 | 0.810 | 98 | 13 | 202 | 287 |
-| logistic_regression@0.5 | 0.940 | 0.830 | 0.881 | 0.888 | 0.053 | 0.948 | 249 | 16 | 51 | 284 |
-| random_forest@0.5 | 0.944 | 0.890 | 0.916 | 0.918 | 0.053 | 0.976 | 267 | 16 | 33 | 284 |
-| hybrid_untuned@0.40 (LR, w=0.6) | 0.960 | 0.807 | 0.877 | 0.887 | 0.033 | 0.952 | 242 | 10 | 58 | 290 |
-| served@suspicious | 0.942 | 0.913 | 0.927 | 0.928 | 0.057 | 0.978 | 274 | 17 | 26 | 283 |
-| served@phishing | 0.980 | 0.810 | 0.887 | 0.897 | 0.017 | 0.978 | 243 | 5 | 57 | 295 |
+| logistic_regression@0.5 | 0.943 | 0.823 | 0.879 | 0.887 | 0.050 | 0.937 | 247 | 15 | 53 | 285 |
+| random_forest@0.5 | 0.920 | 0.877 | 0.898 | 0.900 | 0.077 | 0.972 | 263 | 23 | 37 | 277 |
+| hybrid_untuned@0.40 (LR, w=0.6) | 0.952 | 0.797 | 0.868 | 0.878 | 0.040 | 0.943 | 239 | 12 | 61 | 288 |
+| served@suspicious | 0.936 | 0.883 | 0.909 | 0.912 | 0.060 | 0.974 | 265 | 18 | 35 | 282 |
+| served@phishing | 0.976 | 0.807 | 0.883 | 0.893 | 0.020 | 0.974 | 242 | 6 | 58 | 294 |
 
-**Served configuration** (chosen by 5-fold cross-validation on the training split only — the test split was not used for any choice): model `random_forest` (logistic_regression: OOF F1 0.91, AUC 0.9738, random_forest: OOF F1 0.9324, AUC 0.9834); score = 0.7 × ML + 0.3 × rules; suspicious ≥ 0.36, phishing ≥ 0.48 (phishing threshold set for ≤ 2% false positives on training folds).
+**Served configuration** (chosen by 5-fold cross-validation on the training split only — the test split was not used for any choice): model `random_forest` (logistic_regression: OOF F1 0.8996, AUC 0.9654, random_forest: OOF F1 0.9328, AUC 0.9793); score = 0.8 × ML + 0.2 × rules; suspicious ≥ 0.42, phishing ≥ 0.54 (phishing threshold set for ≤ 2% false positives on training folds).
 
 `served@suspicious` = page flagged as suspicious or phishing (the analyst queue); `served@phishing` = high-confidence phishing only. `hybrid_untuned` = the hand-set starter config (LR, weight 0.6, threshold 0.4) for comparison. FPR = false-positive rate on benign pages.
 
@@ -25,9 +25,9 @@ Dataset: **2000 pages** (1000 phishing, 1000 benign); stratified split 1400 trai
 
 ## T4: false-positive analysis
 
-Served configuration at the suspicious threshold: **17 false positives**, **26 false negatives** on the test set. Every error is listed in `errors.csv` with the rules that fired and the model's top contributing features.
+Served configuration at the suspicious threshold: **18 false positives**, **35 false negatives** on the test set. Every error is listed in `errors.csv` with the rules that fired and the model's top contributing features.
 
-Rules present in false positives: R05 ×2, R20 ×2, R11 ×2, R21 ×1, R26 ×1, R15 ×1, R06 ×1, R13 ×1, R09 ×1
+Rules present in false positives: R05 ×2, R15 ×2, R21 ×1, R26 ×1, R20 ×1, R11 ×1, R13 ×1, R09 ×1
 
 ## Rule coverage (whole dataset)
 
@@ -64,7 +64,7 @@ Rules present in false positives: R05 ×2, R20 ×2, R11 ×2, R21 ×1, R26 ×1, R
 
 ## Decision latency
 
-Full pipeline (parse → features → rules → model → decision) on 300 test pages: mean **88.19 ms**, median 61.54 ms, p95 249.03 ms, max 679.43 ms.
+Full pipeline (parse → features → rules → model → decision) on 300 test pages: mean **91.56 ms**, median 60.98 ms, p95 245.04 ms, max 715.17 ms.
 
 ## Most influential features
 
@@ -72,15 +72,15 @@ Full pipeline (parse → features → rules → model → decision) on 300 test 
 
 | Logistic regression | coef | Random forest | importance |
 |---|---|---|---|
-| free_hosting | 2.798 | path_depth | 0.1001 |
-| query_length | 1.568 | free_hosting | 0.0977 |
-| num_subdomains | -1.507 | num_links | 0.0858 |
-| suspicious_tld | 1.416 | html_length_log | 0.0802 |
-| hidden_iframes | -1.26 | num_scripts | 0.0609 |
-| hyphens_in_host | 1.037 | text_length_log | 0.0609 |
-| url_length | 0.987 | url_length | 0.0507 |
-| html_length_log | -0.949 | hidden_iframes | 0.0419 |
-| login_terms | 0.737 | external_link_ratio | 0.0392 |
-| title_brand_mismatch | 0.669 | external_resource_ratio | 0.0387 |
-| uses_https | -0.668 | host_entropy | 0.0338 |
-| num_dots | 0.657 | hidden_elements | 0.0248 |
+| free_hosting | 2.804 | path_depth | 0.1172 |
+| query_length | 1.846 | free_hosting | 0.1115 |
+| suspicious_tld | 1.296 | external_resource_ratio | 0.0718 |
+| hidden_iframes | -1.181 | external_link_ratio | 0.0681 |
+| num_subdomains | -1.166 | url_length | 0.068 |
+| hyphens_in_host | 1.02 | hidden_iframes | 0.0621 |
+| url_length | 0.997 | hidden_elements | 0.0513 |
+| uses_https | -0.698 | host_entropy | 0.051 |
+| num_forms | -0.696 | num_inputs | 0.0332 |
+| title_brand_mismatch | 0.605 | num_iframes | 0.0325 |
+| digits_in_host | 0.589 | query_length | 0.0304 |
+| host_entropy | 0.538 | hyphens_in_host | 0.0301 |

@@ -1,44 +1,54 @@
 type,file,url,hybrid_score,ml_prob,rule_score,rules_fired,top_model_features,decision
-false_positive,benign_00879.html,hxxps://aswathdamodaran[.]blogspot[.]com/,0.619,0.579,0.712,R05 R21 R26,free_hosting=1 (+0.249); path_depth=0 (+0.116); hidden_iframes=2 (-0.066),phishing
-false_negative,phishing_00732.html,hxxps://groups[.]google[.]com/g/davegas-girilirr/c/idahgdfnvm0,0.079,0.112,0.0,,path_depth=4 (-0.105); num_links=8 (+0.085); url_length=58 (-0.078),benign
-false_positive,benign_00331.html,hxxps://gif[.]pi7[.]org/gif-cropper,0.442,0.632,0.0,,html_length_log=9.254 (+0.101); num_scripts=3 (+0.089); free_hosting=0 (-0.062),suspicious
-false_positive,benign_00556.html,hxxps://my[.]oekofen[.]info/app/,0.477,0.682,0.0,,url_length=28 (+0.093); num_scripts=3 (+0.078); num_links=0 (+0.069),suspicious
-false_positive,benign_00403.html,hxxps://cwp[.]morningstar[.]com/,0.578,0.739,0.2,R20,path_depth=0 (+0.128); url_length=28 (+0.094); free_hosting=0 (-0.073),phishing
-false_positive,benign_00783.html,www[.]hyphensolutions[.]com/mh2supply/home/default[.]asp,0.376,0.43,0.25,R11,path_depth=4 (-0.106); num_links=10 (+0.090); host_entropy=0 (-0.080),suspicious
-false_negative,phishing_00130.html,hxxps://edlpoint[.]com/canva-pro-edu-team-working-invite-link/,0.253,0.254,0.25,R13,title_brand_mismatch=1 (+0.165); num_links=152 (-0.071); text_length_log=9.35 (-0.069),benign
-false_negative,phishing_00297.html,hxxps://www[.]arqamenglishschool[.]com/receptionmanagement/assets/img/onlineabsacozm/session/app/user[.]php,0.338,0.483,0.0,,external_resource_ratio=1 (+0.126); path_depth=7 (-0.082); num_scripts=36 (-0.071),benign
-false_negative,phishing_00320.html,hxxps://www[.]triplux[.]mydt[.]in/canva-pro-subscription/,0.326,0.358,0.25,R13,title_brand_mismatch=1 (+0.088); html_length_log=12.031 (-0.068); text_length_log=7.905 (+0.061),benign
-false_negative,phishing_00648.html,hxxps://www[.]biztobiz[.]org/blog/how-do-i-withdraw-money-from-robinhood-customer-support,0.353,0.317,0.438,R06 R07,num_password_inputs=2 (+0.099); hidden_iframes=5 (-0.064); path_depth=2 (-0.051),benign
-false_positive,benign_00274.html,hxxps://cdn[.]broadstreetads[.]com/stencil-files/645e7492-3332-4226-b362-2b77c82b0ba5/index[.]html,0.372,0.531,0.0,,num_scripts=2 (+0.136); path_depth=3 (-0.133); external_resource_ratio=1 (+0.085),suspicious
-false_positive,benign_00858.html,hxxps://www[.]portlandmarketplace[.]com/,0.412,0.589,0.0,,path_depth=0 (+0.123); free_hosting=0 (-0.074); tracker_iframes=1 (-0.053),suspicious
-false_positive,benign_00048.html,hxxps://2021[.]hrblockonline[.]ca/,0.442,0.632,0.0,,path_depth=0 (+0.106); num_scripts=3 (+0.083); free_hosting=0 (-0.076),suspicious
-false_positive,benign_00234.html,hxxps://perrotta[.]dev/2025/04/bracket-city/,0.47,0.672,0.0,,num_scripts=0 (+0.147); path_depth=3 (-0.120); text_length_log=6.806 (+0.080),suspicious
-false_negative,phishing_00643.html,hxxps://community[.]admitone[.]com/why-cant-i-withdraw-money-from-robinhood-after-sel-2025-09-05/TMQPC7,0.282,0.402,0.0,,text_length_log=7.563 (+0.081); path_depth=2 (-0.077); num_links=22 (+0.077),benign
-false_negative,phishing_00938.html,hxxps://www[.]poulomipalazzo[.]com/www[.]points[.]homeoffice[.]gov[.]uk/gui-sms-jsf/home,0.291,0.245,0.4,R05,path_depth=3 (-0.106); num_scripts=3 (+0.080); num_links=12 (+0.066),benign
-false_negative,phishing_00957.html,hxxps://edenaura[.]pk/Softaccount/Sites/index[.]html,0.222,0.317,0.0,,num_links=330 (-0.084); text_length_log=9.401 (-0.075); path_depth=3 (-0.065),benign
-false_positive,benign_00982.html,mypath[.]pa[.]gov/logoff/,0.529,0.491,0.618,R05 R11 R15,url_length=21 (+0.097); path_depth=2 (-0.091); host_entropy=0 (-0.060),phishing
-false_negative,phishing_00966.html,hxxps://www[.]pro-robinhoodtrades[.]com/,0.301,0.43,0.0,,path_depth=0 (+0.144); num_links=19 (+0.092); text_length_log=9.175 (-0.068),benign
-false_negative,phishing_00161.html,hxxps://www[.]wac-eg[.]info/l0/https:%2f%2fgamingwallpaper[.]s3[.]amazonaws[.]com%2f1bfbb6c0-[.]html,0.188,0.269,0.0,,path_depth=2 (-0.107); num_links=0 (+0.075); num_scripts=20 (-0.073),benign
-false_positive,benign_00373.html,hxxps://dev[.]d2rcollect[.]com/,0.479,0.513,0.4,R06 R20,path_depth=0 (+0.120); num_links=1 (+0.102); hidden_iframes=1 (-0.076),suspicious
-false_negative,phishing_00691.html,hxxps://biglotsusclosing[.]com/search,0.088,0.126,0.0,,num_links=261 (-0.088); text_length_log=10.394 (-0.070); html_length_log=13.392 (-0.068),benign
-false_negative,phishing_00712.html,hxxps://www[.]imdb[.]com/list/ls4102065726/?ref_=lsedt_1,0.209,0.299,0.0,,query_length=12 (+0.170); text_length_log=7.474 (+0.084); hidden_iframes=2 (-0.060),benign
-false_negative,phishing_00305.html,hxxps://megaclickadventurerewardscitadel[.]world/c/2o1je1rrkfp24cd6ia,0.348,0.498,0.0,,num_links=2 (+0.142); host_entropy=3.828 (+0.080); path_depth=2 (-0.080),benign
-false_negative,phishing_00095.html,hxxp://reelcinemas[.]net,0.294,0.42,0.0,,path_depth=0 (+0.121); hidden_iframes=2 (-0.092); num_links=59 (-0.062),benign
-false_negative,phishing_00884.html,hxxps://bitianqy[.]com/main[.]html?,0.314,0.385,0.15,R15,html_length_log=13.675 (-0.068); hidden_iframes=1 (-0.058); null_link_ratio=1 (+0.051),benign
-false_negative,phishing_00418.html,hxxps://www[.]itptrack8[.]com/campaigns/ac436kly7h76e/track-url/vf373s1tr98f0/098e065f9591c896163fc9ad0770a2b38dd3da1d,0.212,0.303,0.0,,path_depth=5 (-0.114); html_length_log=12.882 (-0.108); num_links=0 (+0.067),benign
-false_negative,phishing_00270.html,hxxps://aetherhub[.]com/Tourney/RoundTourney/44046,0.147,0.103,0.25,R06,hidden_iframes=6 (-0.062); num_links=107 (-0.060); path_depth=3 (-0.058),benign
-false_negative,phishing_00049.html,hxxps://store[.]workshopartskinpowered[.]com/sharedfiles/filedetails/?id=3064682533,0.347,0.432,0.15,R15,query_length=13 (+0.151); path_depth=2 (-0.070); num_links=78 (-0.068),benign
-false_negative,phishing_00670.html,hxxps://funkopopuk[.]com,0.341,0.38,0.25,R06,path_depth=0 (+0.132); num_links=239 (-0.070); hidden_iframes=1 (-0.059),benign
-false_negative,phishing_00955.html,hxxps://www[.]serenevillas[.]com/z0f76a1d14fd21a8fb5fd0d03e0fdc3d3cedae52f?wsidchk=10131398&pdata=https%253a%252f%252fwww[.]se,0.295,0.421,0.0,,query_length=208 (+0.211); url_length=279 (+0.082); num_links=112 (-0.079),benign
-false_negative,phishing_00601.html,hxxps://coinmedium[.]com,0.245,0.35,0.0,,path_depth=0 (+0.126); num_links=140 (-0.075); hidden_iframes=1 (-0.069),benign
-false_negative,phishing_00113.html,hxxps://cert[.]konfhub[.]com/sddfdsgr,0.297,0.425,0.0,,num_links=1 (+0.096); free_hosting=0 (-0.069); num_scripts=12 (-0.068),benign
-false_positive,benign_00442.html,hxxps://mapstogpx[.]com/,0.453,0.647,0.0,,path_depth=0 (+0.120); free_hosting=0 (-0.068); url_length=22 (+0.061),suspicious
-false_negative,phishing_00215.html,hxxps://cryptoquant[.]com/community/dashboard/68e420b74885f90809fc38ed,0.151,0.216,0.0,,text_length_log=7.194 (+0.097); path_depth=3 (-0.073); hidden_iframes=2 (-0.072),benign
-false_positive,benign_00816.html,hxxps://arc[.]net/,0.426,0.608,0.0,,path_depth=0 (+0.151); url_length=16 (+0.108); html_length_log=13.325 (-0.081),suspicious
-false_negative,phishing_00087.html,hxxps://www[.]imdb[.]com/list/ls4106441016/,0.071,0.101,0.0,,text_length_log=7.474 (+0.096); hidden_iframes=2 (-0.061); path_depth=2 (-0.060),benign
-false_positive,benign_00848.html,hxxps://tube[.]ac/ga[.]html,0.508,0.725,0.0,,hidden_iframes=2 (-0.100); external_resource_ratio=1 (+0.091); num_scripts=5 (+0.088),phishing
-false_negative,phishing_00537.html,hxxps://community[.]admitone[.]com/can-i-use-robinhood-without-a-bank-accountfaqssupp-2025-09-05/TKXAS9,0.311,0.444,0.0,,text_length_log=7.532 (+0.079); num_links=22 (+0.077); path_depth=2 (-0.073),benign
-false_positive,benign_00958.html,hxxps://ctedwatch[.]org/,0.367,0.524,0.0,,path_depth=0 (+0.136); num_links=129 (-0.100); external_link_ratio=0.946 (+0.090),suspicious
-false_negative,phishing_00118.html,hxxps://printerval[.]com/perrier-bottle-essential-t-shirt-t-shirts-p1524339243,0.037,0.052,0.0,,text_length_log=9.481 (-0.061); num_links=246 (-0.056); html_length_log=13.032 (-0.051),benign
-false_positive,benign_00386.html,hxxps://www[.]whois-raynette[.]com/en/tld/fedex,0.595,0.743,0.25,R13,html_length_log=9.175 (+0.136); path_depth=3 (-0.118); free_hosting=0 (-0.069),phishing
-false_positive,benign_00103.html,hxxps://www[.]legis[.]state[.]pa[.]us/WU01/LI/LI/CT/HTM/20/00[.]021[.][.]HTM,0.373,0.447,0.2,R09,num_scripts=0 (+0.188); path_depth=7 (-0.099); num_links=0 (+0.092),suspicious
+false_positive,benign_00879.html,hxxps://aswathdamodaran[.]blogspot[.]com/,0.68,0.672,0.712,R05 R21 R26,free_hosting=1 (+0.313); hidden_iframes=2 (-0.116); path_depth=0 (+0.106),phishing
+false_negative,phishing_00732.html,hxxps://groups[.]google[.]com/g/davegas-girilirr/c/idahgdfnvm0,0.074,0.093,0.0,,path_depth=4 (-0.108); url_length=58 (-0.061); hidden_elements=3 (-0.060),benign
+false_positive,benign_00556.html,hxxps://my[.]oekofen[.]info/app/,0.541,0.676,0.0,,url_length=28 (+0.135); host_entropy=2.873 (-0.113); hidden_elements=0 (+0.075),phishing
+false_negative,phishing_00289.html,hxxps://littleriverstudiosny[.]com,0.36,0.45,0.0,,path_depth=0 (+0.151); external_link_ratio=0.417 (-0.074); free_hosting=0 (-0.073),benign
+false_negative,phishing_00410.html,hxxps://app[.]atcapital[.]us/,0.402,0.327,0.7,R04 R05,path_depth=0 (+0.157); hidden_elements=10 (-0.074); num_iframes=6 (-0.069),benign
+false_negative,phishing_00134.html,hxxps://surl[.]lu/oceabs,0.354,0.368,0.3,R22,external_resource_ratio=1 (+0.159); hidden_iframes=6 (-0.104); external_link_ratio=0.625 (+0.059),benign
+false_positive,benign_00403.html,hxxps://cwp[.]morningstar[.]com/,0.666,0.783,0.2,R20,path_depth=0 (+0.154); url_length=28 (+0.097); free_hosting=0 (-0.080),phishing
+false_negative,phishing_00130.html,hxxps://edlpoint[.]com/canva-pro-edu-team-working-invite-link/,0.317,0.334,0.25,R13,title_brand_mismatch=1 (+0.159); hidden_iframes=0 (+0.060); path_depth=1 (-0.052),benign
+false_negative,phishing_00297.html,hxxps://www[.]arqamenglishschool[.]com/receptionmanagement/assets/img/onlineabsacozm/session/app/user[.]php,0.383,0.479,0.0,,external_resource_ratio=1 (+0.168); path_depth=7 (-0.085); free_hosting=0 (-0.053),benign
+false_negative,phishing_00723.html,hxxp://www[.]skpcoin[.]com/index[.]html,0.318,0.397,0.0,,url_length=33 (+0.072); uses_https=0 (+0.068); free_hosting=0 (-0.066),benign
+false_negative,phishing_00320.html,hxxps://www[.]triplux[.]mydt[.]in/canva-pro-subscription/,0.316,0.332,0.25,R13,title_brand_mismatch=1 (+0.129); url_length=51 (-0.059); free_hosting=0 (-0.058),benign
+false_negative,phishing_00443.html,hxxps://pastehtml[.]com/view/ba72y82ly[.]html,0.335,0.419,0.0,,path_depth=2 (-0.126); num_subdomains=0 (+0.089); num_dots=1 (+0.086),benign
+false_negative,phishing_00648.html,hxxps://www[.]biztobiz[.]org/blog/how-do-i-withdraw-money-from-robinhood-customer-support,0.321,0.292,0.438,R06 R07,num_password_inputs=2 (+0.078); hidden_iframes=5 (-0.072); path_depth=2 (-0.044),benign
+false_positive,benign_00048.html,hxxps://2021[.]hrblockonline[.]ca/,0.438,0.548,0.0,,path_depth=0 (+0.146); digits_in_host=4 (+0.122); free_hosting=0 (-0.072),suspicious
+false_positive,benign_00234.html,hxxps://perrotta[.]dev/2025/04/bracket-city/,0.431,0.539,0.0,,path_depth=3 (-0.163); num_dots=1 (+0.087); external_resource_ratio=0 (+0.081),suspicious
+false_negative,phishing_00643.html,hxxps://community[.]admitone[.]com/why-cant-i-withdraw-money-from-robinhood-after-sel-2025-09-05/TMQPC7,0.287,0.358,0.0,,hidden_elements=0 (+0.086); path_depth=2 (-0.082); num_inputs=0 (+0.063),benign
+false_negative,phishing_00938.html,hxxps://www[.]poulomipalazzo[.]com/www[.]points[.]homeoffice[.]gov[.]uk/gui-sms-jsf/home,0.163,0.103,0.4,R05,path_depth=3 (-0.089); num_inputs=12 (-0.055); external_link_ratio=0.333 (-0.055),benign
+false_negative,phishing_00957.html,hxxps://edenaura[.]pk/Softaccount/Sites/index[.]html,0.326,0.408,0.0,,path_depth=3 (-0.082); num_dots=1 (+0.073); url_length=48 (-0.064),benign
+false_positive,benign_00982.html,mypath[.]pa[.]gov/logoff/,0.524,0.501,0.618,R05 R11 R15,path_depth=2 (-0.112); url_length=21 (+0.109); hidden_elements=0 (+0.070),suspicious
+false_negative,phishing_00966.html,hxxps://www[.]pro-robinhoodtrades[.]com/,0.359,0.449,0.0,,path_depth=0 (+0.144); hyphens_in_host=1 (+0.087); num_iframes=3 (-0.072),benign
+false_positive,benign_00691.html,hxxps://ww12[.]keepvid[.]works/,0.444,0.555,0.0,,path_depth=0 (+0.168); external_link_ratio=0.086 (-0.110); url_length=27 (+0.094),suspicious
+false_positive,benign_00804.html,hxxps://d6tizftlrpuof[.]cloudfront[.]net/live/i/5f29093bb5250a6beb12ab59/8c73ce6ea6c091a6edd17dbd7e289aba22421d1b[.]html,0.443,0.554,0.0,,path_depth=4 (-0.147); digits_in_host=1 (+0.081); host_entropy=3.642 (+0.078),suspicious
+false_negative,phishing_00161.html,hxxps://www[.]wac-eg[.]info/l0/https:%2f%2fgamingwallpaper[.]s3[.]amazonaws[.]com%2f1bfbb6c0-[.]html,0.244,0.305,0.0,,hyphens_in_host=1 (+0.114); path_depth=2 (-0.104); free_hosting=0 (-0.066),benign
+false_positive,benign_00428.html,hxxps://www[.]fidelitypayment[.]com/,0.424,0.53,0.0,,external_resource_ratio=1 (+0.154); external_link_ratio=0.975 (+0.148); hidden_iframes=2 (-0.117),suspicious
+false_negative,phishing_00691.html,hxxps://biglotsusclosing[.]com/search,0.295,0.369,0.0,,hidden_iframes=0 (+0.070); num_iframes=0 (+0.061); hidden_elements=8 (-0.060),benign
+false_negative,phishing_00712.html,hxxps://www[.]imdb[.]com/list/ls4102065726/?ref_=lsedt_1,0.257,0.321,0.0,,query_length=12 (+0.246); hidden_iframes=2 (-0.064); path_depth=2 (-0.055),benign
+false_positive,benign_00041.html,hxxps://www[.]topproducer8i[.]com/m/,0.453,0.529,0.15,R15,digits_in_host=1 (+0.085); url_length=32 (+0.066); hidden_elements=0 (+0.057),suspicious
+false_negative,phishing_00376.html,hxxps://tensor[.]art/articles/913129616342791028,0.326,0.407,0.0,,path_depth=2 (-0.091); num_dots=1 (+0.072); hidden_iframes=0 (+0.068),benign
+false_positive,benign_00203.html,hxxp://www[.]fabianforte[.]net/biography[.]html,0.46,0.576,0.0,,external_resource_ratio=0 (+0.094); uses_https=0 (+0.077); free_hosting=0 (-0.073),suspicious
+false_negative,phishing_00305.html,hxxps://megaclickadventurerewardscitadel[.]world/c/2o1je1rrkfp24cd6ia,0.387,0.484,0.0,,path_depth=2 (-0.096); null_link_ratio=0.5 (+0.086); hidden_elements=0 (+0.077),benign
+false_positive,benign_00124.html,hxxps://mykgirls[.]com/ktown,0.62,0.775,0.0,,url_length=26 (+0.132); hidden_elements=0 (+0.075); free_hosting=0 (-0.061),phishing
+false_negative,phishing_00613.html,hxxps://moe[.]mxz[.]mybluehost[.]me/includes/vipps,0.36,0.45,0.0,,path_depth=2 (-0.115); external_resource_ratio=1 (+0.107); url_length=44 (-0.080),benign
+false_negative,phishing_00095.html,hxxp://reelcinemas[.]net,0.275,0.344,0.0,,path_depth=0 (+0.146); hidden_iframes=2 (-0.139); uses_https=0 (+0.103),benign
+false_negative,phishing_00884.html,hxxps://bitianqy[.]com/main[.]html?,0.371,0.427,0.15,R15,null_link_ratio=1 (+0.119); hidden_iframes=1 (-0.100); hidden_elements=21 (-0.090),benign
+false_negative,phishing_00270.html,hxxps://aetherhub[.]com/Tourney/RoundTourney/44046,0.103,0.066,0.25,R06,hidden_iframes=6 (-0.082); hidden_elements=23 (-0.057); path_depth=3 (-0.055),benign
+false_negative,phishing_00670.html,hxxps://funkopopuk[.]com,0.309,0.323,0.25,R06,path_depth=0 (+0.137); hidden_iframes=1 (-0.090); url_length=22 (+0.061),benign
+false_negative,phishing_00601.html,hxxps://coinmedium[.]com,0.263,0.329,0.0,,path_depth=0 (+0.137); hidden_iframes=1 (-0.097); url_length=22 (+0.076),benign
+false_negative,phishing_00113.html,hxxps://cert[.]konfhub[.]com/sddfdsgr,0.381,0.477,0.0,,hidden_elements=0 (+0.074); free_hosting=0 (-0.069); external_resource_ratio=0.111 (-0.062),benign
+false_negative,phishing_00478.html,hxxps://webpromo[.]my[.]id/pgrm,0.328,0.41,0.0,,url_length=27 (+0.139); external_resource_ratio=0.167 (-0.115); free_hosting=0 (-0.076),benign
+false_positive,benign_00439.html,hxxps://knowt[.]com/,0.575,0.718,0.0,,path_depth=0 (+0.137); url_length=18 (+0.120); free_hosting=0 (-0.080),phishing
+false_negative,phishing_00420.html,hxxps://sectran[.]controltekusa[.]com/,0.354,0.232,0.843,R03 R06 R07 R17,path_depth=0 (+0.135); hidden_iframes=4 (-0.130); external_link_ratio=0.194 (-0.054),benign
+false_negative,phishing_00008.html,hxxps://astera[.]zendesk[.]com/hc/en-us/community/posts/45039543479955-Can-I-contact-Robinhood-by-phone-Fast-services,0.297,0.371,0.0,,hidden_elements=0 (+0.076); path_depth=5 (-0.074); free_hosting=0 (-0.055),benign
+false_negative,phishing_00215.html,hxxps://cryptoquant[.]com/community/dashboard/68e420b74885f90809fc38ed,0.085,0.106,0.0,,hidden_iframes=2 (-0.081); path_depth=3 (-0.065); hidden_elements=9 (-0.058),benign
+false_negative,phishing_00283.html,hxxps://ln[.]run/fanpagehelpcenter,0.287,0.358,0.0,,hidden_iframes=0 (+0.098); hidden_elements=5 (-0.092); free_hosting=0 (-0.059),benign
+false_positive,benign_00816.html,hxxps://arc[.]net/,0.534,0.668,0.0,,path_depth=0 (+0.139); url_length=16 (+0.116); free_hosting=0 (-0.081),suspicious
+false_negative,phishing_00087.html,hxxps://www[.]imdb[.]com/list/ls4106441016/,0.017,0.021,0.0,,hidden_iframes=2 (-0.080); path_depth=2 (-0.063); hidden_elements=19 (-0.051),benign
+false_negative,phishing_00349.html,hxxps://go[.]ly/cek-statement,0.42,0.525,0.0,,url_length=27 (+0.114); external_link_ratio=0.136 (-0.085); hidden_elements=0 (+0.074),benign
+false_positive,benign_00848.html,hxxps://tube[.]ac/ga[.]html,0.479,0.599,0.0,,external_resource_ratio=1 (+0.161); hidden_iframes=2 (-0.122); external_link_ratio=0.75 (+0.114),suspicious
+false_negative,phishing_00537.html,hxxps://community[.]admitone[.]com/can-i-use-robinhood-without-a-bank-accountfaqssupp-2025-09-05/TKXAS9,0.323,0.404,0.0,,path_depth=2 (-0.085); hidden_elements=0 (+0.085); suspicious_url_tokens=1 (+0.070),benign
+false_positive,benign_00958.html,hxxps://ctedwatch[.]org/,0.547,0.684,0.0,,path_depth=0 (+0.142); free_hosting=0 (-0.075); url_length=22 (+0.059),phishing
+false_negative,phishing_00118.html,hxxps://printerval[.]com/perrier-bottle-essential-t-shirt-t-shirts-p1524339243,0.159,0.198,0.0,,hidden_iframes=3 (-0.073); host_entropy=3.547 (+0.051); free_hosting=0 (-0.040),benign
+false_positive,benign_00386.html,hxxps://www[.]whois-raynette[.]com/en/tld/fedex,0.502,0.565,0.25,R13,path_depth=3 (-0.134); hyphens_in_host=1 (+0.093); title_brand_mismatch=1 (+0.078),suspicious
+false_positive,benign_00103.html,hxxps://www[.]legis[.]state[.]pa[.]us/WU01/LI/LI/CT/HTM/20/00[.]021[.][.]HTM,0.442,0.502,0.2,R09,path_depth=7 (-0.128); external_resource_ratio=0 (+0.105); url_length=62 (-0.089),suspicious

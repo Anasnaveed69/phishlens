@@ -1,12 +1,19 @@
 # User & administrator guide
 
+## Everyone
+* **Dashboard** (start page) — system status (model, config version), decisions, severity, most frequent
+  indicators, recent phishing detections, latency and analyst feedback.
+* **Account** (click your name, top right) — change your password; your other sessions are signed out.
+
 ## Analyst
 1. **Analyze** → choose a saved `.html`/`.htm` page (max 2 MB). Optionally add the page's original URL
    (only used for URL features — it is never visited) and a ground-truth label.
 2. The result page shows the **decision**, risk score against the thresholds, the **rules that fired**
    with evidence, and the **model explanation** (red bars push towards phishing, green towards benign).
 3. Use **Feedback** to mark the decision correct / false positive / false negative.
-4. **Export JSON/CSV** for a sanitized report (no page content). **History** lists all runs with filters.
+4. **Export JSON/CSV** for a sanitized report (no page content), or **Print / save as PDF**.
+   **History** lists all runs with filters; tick two rows and press **Compare selected** to see
+   two results side by side, including the features that differ.
 5. **Dataset** imports a `.zip` of pages plus `labels.csv` (`filename,label,source_url`).
 
 ## Viewer
@@ -20,11 +27,14 @@ Read-only, restricted view: decision, score, recommended action and reasons. No 
   checks that no record was altered.
 * **Model** — version, training metrics and integrity status; reload after retraining.
 
-## Retraining
+## Retraining and evaluation
 ```bash
-python scripts/train_model.py --data path/to/approved_dataset   # folder with pages + labels.csv
+python scripts/evaluate.py --data path/to/dataset --drop-size-features   # pages + labels.csv
 ```
-Then Admin → Model → *Reload model from disk*.
+This chooses the model by cross-validation, calibrates thresholds on the training split, scores the
+held-out split once, writes `reports/` and saves the model. Then Admin → Model → *Reload model from disk*.
+Without the raw pages, `python scripts/train_from_features.py` rebuilds the shipped model from
+`reports/features.csv` and verifies it against the recorded predictions.
 
 ## Recovery
 * Restarting the server is safe: the DB, sessions, config versions and audit chain persist in `data/`.

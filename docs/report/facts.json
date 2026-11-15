@@ -1,0 +1,215 @@
+{
+  "repo_url": "https://github.com/Anasnaveed69/phishlens",
+  "report_date": "15 November 2026",
+  "n_features": 53,
+  "n_rules": 26,
+  "tests_passed": 65,
+  "tests_total": 65,
+  "ci_pythons": "3.11 and 3.12",
+  "threats": [
+    [
+      "T1",
+      "Password guessing / brute force (S) \u2014 `/api/auth/login`",
+      "Argon2id hashes; 5 attempts/min per IP+user; same error for unknown user and wrong password; constant-ish timing with dummy hash"
+    ],
+    [
+      "T2",
+      "Session hijacking (S) \u2014 cookies",
+      "Random 256-bit token, HttpOnly + SameSite=Strict cookie, only sha256 stored in DB, 30-min expiry, sessions killed on logout/role change"
+    ],
+    [
+      "T3",
+      "CSRF (T) \u2014 state-changing endpoints",
+      "Per-session CSRF token required in X-CSRF-Token for POST/PUT/PATCH/DELETE, plus SameSite=Strict"
+    ],
+    [
+      "T4",
+      "Privilege escalation / broken access control (E) \u2014 all endpoints",
+      "Server-side RBAC (require(permission)), least privilege per role, viewer gets a restricted projection, denials audited with generic message"
+    ],
+    [
+      "T5",
+      "Stored XSS from uploaded page content (T/E) \u2014 evidence shown in UI",
+      "UI renders with textContent only (no innerHTML), strict CSP (script-src 'self', no inline), evidence truncated"
+    ],
+    [
+      "T6",
+      "Malicious page executes / beacons out (I/E) \u2014 feature extraction",
+      "Pure-Python parser, no rendering, no JS engine, no network requests; declared URL is parsed, never fetched"
+    ],
+    [
+      "T7",
+      "Unsafe file handling: zip slip, zip bomb, huge uploads (D/T) \u2014 upload & import",
+      "Extension + content sniffing, size cap read with read(limit+1), archive read in memory only, archive paths discarded, declared and actual expanded size limits, file-count limit, server-generated storage names"
+    ],
+    [
+      "T8",
+      "SQL injection (T/I) \u2014 repository",
+      "Only parameterized queries; filter column names are fixed in code; LIKE wildcards escaped"
+    ],
+    [
+      "T9",
+      "Tampering with audit records (R) \u2014 audit log",
+      "Append-only triggers block UPDATE/DELETE; SHA-256 hash chain detects edits to the DB file; verify endpoint"
+    ],
+    [
+      "T10",
+      "Tampered or swapped model file (T/E) \u2014 `models/`",
+      "Model loaded only if SHA-256 matches metadata and feature order matches; otherwise rules-only + logged"
+    ],
+    [
+      "T11",
+      "Sensitive data leaking into logs/reports (I) \u2014 audit, export",
+      "Recursive redaction of secret-like keys, e-mail masking, string truncation; exports exclude raw HTML and feature dumps"
+    ],
+    [
+      "T12",
+      "Error messages leaking internals (I) \u2014 all",
+      "Stable error codes, generic messages, stack traces logged server-side only with a reference id"
+    ],
+    [
+      "T13",
+      "CSV/formula injection in exports (T) \u2014 CSV export",
+      "Cells starting with = + - @ are prefixed with '"
+    ],
+    [
+      "T14",
+      "Unreviewed config change silently alters decisions (R/T) \u2014 admin config",
+      "Versioned config with reason, explicit confirmation, audit entry with before/after, each analysis stores its config version"
+    ],
+    [
+      "T15",
+      "Denial of service via analysis flooding (D) \u2014 analyze endpoints",
+      "30 analyses/min per user, size limits"
+    ],
+    [
+      "T16",
+      "Model learns a dataset shortcut (T, integrity of decisions) \u2014 ML model",
+      "Explanations expose it (page-size features dominated small benign pages); size-feature ablation evaluated; brand-ownership feature; fixtures checked as a generalisation test"
+    ]
+  ],
+  "n_threats": 16,
+  "fixture_pages": 7,
+  "fixture_results": [
+    {
+      "file": "benign_article.html",
+      "expected": "benign",
+      "actual": "benign",
+      "evidence": "score 0.25 (ML 0.32); no rule fired",
+      "pass": true
+    },
+    {
+      "file": "benign_bank_login.html",
+      "expected": "benign",
+      "actual": "suspicious",
+      "evidence": "score 0.50 (ML 0.63); no rule fired",
+      "pass": false
+    },
+    {
+      "file": "phish_brand_clone.html",
+      "expected": "phishing",
+      "actual": "phishing",
+      "evidence": "score 0.80 (ML 0.75); rules R03, R04, R05, R06, R08, R11, R12, R13, R15, R23",
+      "pass": true
+    },
+    {
+      "file": "phish_ip_host.html",
+      "expected": "phishing",
+      "actual": "phishing",
+      "evidence": "score 0.63 (ML 0.55); rules R01, R04, R05, R07, R11, R13, R20",
+      "pass": true
+    },
+    {
+      "file": "edge_brand_mention_article.html",
+      "expected": "benign",
+      "actual": "phishing",
+      "evidence": "score 0.62 (ML 0.77); no rule fired",
+      "pass": false
+    },
+    {
+      "file": "edge_malformed.html",
+      "expected": "benign",
+      "actual": "phishing",
+      "evidence": "score 0.62 (ML 0.77); no rule fired",
+      "pass": false
+    },
+    {
+      "file": "benign_bank_portal.html",
+      "expected": "benign",
+      "actual": "benign",
+      "evidence": "score 0.30 (ML 0.38); no rule fired",
+      "pass": true
+    }
+  ],
+  "tfinal": [
+    [
+      "Malformed input (.exe, binary, non-HTML, empty)",
+      "Rejected before processing, logged",
+      "415/422, sample.upload failure event (test_malformed_and_oversized_input_rejected)"
+    ],
+    [
+      "Oversized page / zip bomb / too many files",
+      "Rejected",
+      "413/422 (test_zip_bomb_declared_size_rejected, test_zip_with_too_many_files_rejected)"
+    ],
+    [
+      "Unauthorized request (viewer uploads, analyst opens admin)",
+      "Generic denial, logged, record not exposed",
+      "403 FORBIDDEN + authz.denied event (test_viewer_cannot_upload_and_is_logged)"
+    ],
+    [
+      "Repeated submission",
+      "Duplicate detected, fresh analysis",
+      "same sample id, duplicate=true (test_full_workflow_and_repeated_submission)"
+    ],
+    [
+      "Safe failure: no model / tampered model",
+      "Rules-only mode, no crash",
+      "mode=rules_only (test_rules_only_mode_when_no_model); SHA-256 check on load"
+    ],
+    [
+      "Recovery after restart",
+      "Data, config and audit chain intact",
+      "chain valid after re-init (test_recovery_after_restart)"
+    ],
+    [
+      "Brute force / session fixation / cross-session CSRF",
+      "Blocked",
+      "429 / 401 / 403 (tests/test_security.py)"
+    ]
+  ],
+  "screens": [
+    {
+      "file": "dist/demo/step_02.png",
+      "caption": "Normal sample: a bank login page on its own domain is classified benign"
+    },
+    {
+      "file": "dist/demo/step_03.png",
+      "caption": "Adverse sample: PHISHING with the specific indicators and the model's feature contributions"
+    },
+    {
+      "file": "dist/demo/step_04.png",
+      "caption": "Each fired rule shows its reason and the evidence extracted from the page"
+    },
+    {
+      "file": "dist/demo/step_09.png",
+      "caption": "Side-by-side comparison of the adverse and the normal result"
+    },
+    {
+      "file": "dist/demo/step_11.png",
+      "caption": "Restricted viewer: decision and reasons only"
+    },
+    {
+      "file": "dist/demo/step_15.png",
+      "caption": "After the admin disables R06, a re-run records config v2 and lists R06 as disabled"
+    },
+    {
+      "file": "dist/demo/step_16.png",
+      "caption": "Append-only, hash-chained audit log with the configuration change and the denied request"
+    },
+    {
+      "file": "dist/demo/step_17.png",
+      "caption": "Dashboard: decisions, severity, top indicators, latency and analyst feedback"
+    }
+  ]
+}

@@ -12,6 +12,10 @@
 
 ## Data-flow diagram with trust boundaries
 
+![DFD](diagrams/dfd.png)
+
+Source: `docs/diagrams/dfd.dot` (Graphviz). Same diagram as Mermaid:
+
 ```mermaid
 flowchart LR
   subgraph TB1["Trust boundary 1: untrusted client"]
@@ -41,10 +45,10 @@ flowchart LR
 
 1. **Import & labeling (FR-1)** — `POST /api/samples` or `/api/samples/import`: auth + permission + CSRF,
    rate limit, file type/size/content checks, optional label + declared URL validated, duplicate detection by SHA-256.
-2. **Feature extraction (FR-2)** — `engine/features.py`: 35 numeric URL/DOM/text/visual-risk features + short evidence snippets.
-3. **Baseline rules (FR-3)** — `engine/rules.py`: 15 named rules, noisy-OR score, admin can disable rules.
-4. **ML classifier (FR-4)** — `engine/model.py`: StandardScaler + LogisticRegression, per-feature contributions.
-5. **Explanation (FR-5)** — final score = `ml_weight·ML + (1−ml_weight)·rules`, thresholds → decision, severity,
+2. **Feature extraction (FR-2)** — `engine/features.py`: 53 numeric URL/DOM/text/visual-risk features (served model) + short evidence snippets.
+3. **Baseline rules (FR-3)** — `engine/rules.py`: 26 named rules, noisy-OR score, admin can disable rules.
+4. **ML classifier (FR-4)** — `engine/model.py`: Random forest chosen by 5-fold CV (logistic regression also supported); exact per-feature contributions (path decomposition).
+5. **Explanation (FR-5)** — final score = `ml_weight·ML + (1−ml_weight)·rules` (calibrated: 0.8; suspicious ≥ 0.42, phishing ≥ 0.54), thresholds → decision, severity,
    recommended action, fired rules with evidence, top model contributions, all versions stored.
 6. **Feedback & export (FR-6)** — analyst marks correct / FP / FN; sanitized JSON/CSV report; history CSV.
 
@@ -92,3 +96,5 @@ Actions logged: `auth.login`, `auth.logout`, `authz.denied`, `security.csrf_fail
 | GET/POST/PATCH | `/api/admin/users` | user:manage |
 | GET | `/api/admin/audit`, `/api/admin/audit/verify` | audit:read |
 | GET/POST | `/api/admin/model`, `/api/admin/model/reload` | config:read / config:write |
+| GET | `/api/dashboard` | result:read |
+| POST | `/api/auth/password` | session |

@@ -5,3 +5,4 @@ phish_brand_clone.html,phishing,http://paypal-secure-verify.tk/webscr/signin
 phish_ip_host.html,phishing,http://185.22.91.7/office365/login.php
 edge_brand_mention_article.html,benign,https://security-blog.example.org/fake-payment-pages
 edge_malformed.html,benign,https://legacy.example.com/old
+benign_bank_portal.html,benign,https://www.hbl.com/ib/login

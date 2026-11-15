@@ -29,15 +29,17 @@ const P = (text, opts = {}) => new Paragraph({
 const B = (t) => new TextRun({ text: t, bold: true });
 const I = (t) => new TextRun({ text: t, italics: true });
 const C = (t) => new TextRun({ text: t, font: "Consolas", size: 20 });
-const H1 = (t) => new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun(t)] });
-const H2 = (t) => new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun(t)] });
+const HEADINGS = [];
+const H1 = (t) => { HEADINGS.push([t, 1]); return new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun(t)] }); };
+const H2 = (t) => { HEADINGS.push([t, 2]); return new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun(t)] }); };
 const H3 = (t) => new Paragraph({ heading: HeadingLevel.HEADING_3, children: [new TextRun(t)] });
 const bullet = (children, level = 0) => new Paragraph({
   numbering: { reference: "bullets", level }, spacing: { after: 60, line: 280 },
   children: (Array.isArray(children) ? children : [children]).map((t) => (typeof t === "string" ? new TextRun(t) : t)),
 });
+let numRef = "num-objectives";
 const numbered = (children) => new Paragraph({
-  numbering: { reference: "numbers", level: 0 }, spacing: { after: 60, line: 280 },
+  numbering: { reference: numRef, level: 0 }, spacing: { after: 60, line: 280 },
   children: (Array.isArray(children) ? children : [children]).map((t) => (typeof t === "string" ? new TextRun(t) : t)),
 });
 let figNo = 0, tabNo = 0;
@@ -124,7 +126,16 @@ const cover = [
 // ------------------------------------------------------------------ body
 const body = [];
 body.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 200 }, children: [new TextRun({ text: "Contents", bold: true, size: 32 })] }));
-body.push(new TableOfContents("Contents", { hyperlink: true, headingStyleRange: "1-2" }));
+const tocFile = R("docs/report/toc.json");
+const toc = fs.existsSync(tocFile) ? JSON.parse(fs.readFileSync(tocFile, "utf8")) : null;
+const TOC_ENTRIES = [];
+if (toc) {
+  toc.forEach(([text, level, page]) => body.push(new Paragraph({
+    spacing: { after: level === 1 ? 80 : 40, before: level === 1 ? 100 : 0 }, indent: { left: level === 1 ? 0 : 400 },
+    tabStops: [{ type: TabStopType.RIGHT, position: CONTENT_W, leader: "dot" }],
+    children: [new TextRun({ text, bold: level === 1, size: level === 1 ? 24 : 22 }), new TextRun({ text: `\t${page}`, size: 22 })],
+  })));
+}
 body.push(new Paragraph({ children: [new PageBreak()] }));
 
 body.push(H1("Abstract"));
@@ -168,6 +179,7 @@ body.push(...table(["Layer", "Location", "Responsibility"], [
 ], [2, 3, 7], "Layered architecture", { leftAll: true }));
 body.push(...image("docs/diagrams/dfd.png", 620, "Data-flow diagram with the four trust boundaries (TB1–TB4)"));
 body.push(H2("2.1 Working sequence"));
+numRef = "num-sequence";
 [
   ["Import and labeling (FR-1). ", "An authorized user uploads one .html page (with an optional declared URL and label) or a .zip dataset with labels.csv. Unauthenticated, unauthorized, CSRF-less, oversized, binary, non-HTML or malformed input is rejected before processing and logged. Identical content is de-duplicated by SHA-256."],
   ["Safe feature extraction (FR-2). ", `The page is parsed with a pure-Python HTML parser; scripts are never run and no URL is ever requested. ${facts.n_features} numeric features plus short, truncated evidence snippets are produced.`],
@@ -188,7 +200,8 @@ body.push(...table(["Group", "Examples"], [
   ["Visual-risk (from markup)", "brand claimed in title/heading/logo but not owned by the domain, brand logo or favicon hot-linked from the real brand, external favicon/logo, hidden elements, bare login page"],
 ], [2, 9], "Feature groups", { leftAll: true }));
 body.push(H2("3.2 Baseline rules"));
-body.push(P(`Table ${tabNo + 1} lists all ${facts.n_rules} rules with how often each fired on the ${ds.pages}-page real dataset. Rule precision is the share of pages a rule fired on that were actually phishing.`));
+const RULE_TABLE = tabNo + 1;
+body.push(P(`Table ${RULE_TABLE} lists all ${facts.n_rules} rules with how often each fired on the ${ds.pages}-page real dataset. Rule precision is the share of pages a rule fired on that were actually phishing.`));
 body.push(...table(["ID", "Rule", "Weight", "Phish %", "Benign %", "Precision"],
   ev.rule_coverage.map((c) => [c.id, c.name, c.weight, `${c.fires_on_phishing_pct}`, `${c.fires_on_benign_pct}`, c.precision === null ? "—" : f3(c.precision)]),
   [1, 6, 1.3, 1.4, 1.4, 1.5], `Rule set ${ev.versions.rules} and its coverage on PhreshPhish (${ds.pages} pages)`, { size: 17 }));
@@ -240,7 +253,7 @@ body.push(...table(["Method", "Precision", "Recall", "F1", "FPR", "ROC-AUC", "TP
 body.push(P([
   "The served configuration flags ", B(`${cmS.tp} of ${cmS.tp + cmS.fn} phishing pages`), ` (recall ${pct(served.recall)}) while flagging ${cmS.fp} of ${cmS.fp + cmS.tn} benign pages (${pct(served.false_positive_rate)}). `,
   `Its high-confidence band ("phishing") is right ${pct(hi.precision)} of the time with ${pct(hi.false_positive_rate)} false positives, so it can drive automatic blocking while the "suspicious" band feeds the analyst queue. `,
-  `Rules alone are weak on modern phishing (F1 ${f3(res["rules_only@0.40"].f1)}): their value is the explanation and the high-precision indicators listed in Table 4, which the combined score benefits from (served F1 ${f3(served.f1)} vs ${f3(res["random_forest@0.5"].f1)} for the forest alone and ${f3(res["hybrid_untuned@0.40 (LR, w=0.6)"].f1)} for the untuned starter configuration).`,
+  `Rules alone are weak on modern phishing (F1 ${f3(res["rules_only@0.40"].f1)}): their value is the explanation and the high-precision indicators listed in Table ${RULE_TABLE}, which the combined score benefits from (served F1 ${f3(served.f1)} vs ${f3(res["random_forest@0.5"].f1)} for the forest alone and ${f3(res["hybrid_untuned@0.40 (LR, w=0.6)"].f1)} for the untuned starter configuration).`,
 ]));
 body.push(...image("reports/roc_pr.png", 600, "ROC and precision–recall curves on the test set"));
 body.push(...image("reports/confusion_matrix.png", 300, "Confusion matrix of the served configuration (suspicious threshold)"));
@@ -250,6 +263,12 @@ body.push(P("False-positive analysis was not a one-off: each round of errors on 
 body.push(...table(["Version", "What changed (from the error analysis)", "F1", "Precision", "Recall", "FPR"],
   hist.iterations.map((h) => [h.version, h.change, f3(h.f1), f3(h.precision), f3(h.recall), pct(h.fpr)]),
   [1.4, 7, 1, 1.2, 1.1, 1], "Engine iterations driven by false-positive / false-negative analysis", { size: 17 }));
+body.push(P("The last iteration is an ablation: the same model trained with and without the five pure page-size features. Cross-validation on the training split (the criterion we committed to before looking at the test set) rates them equal, and the variant without size features generalises better to small benign pages it has never seen, so it is the one served."));
+const ab = hist.ablation;
+body.push(...table(["Variant", "CV F1 (train)", "Test F1", "Precision", "Recall", "FPR", "Small fixtures OK"], [
+  ["All features", f3(ab.all_features.cv_f1), f3(ab.all_features.test_f1), f3(ab.all_features.precision), f3(ab.all_features.recall), pct(ab.all_features.fpr), ab.all_features.fixtures_pass],
+  ["Without page-size features (served)", f3(ab.no_size_features.cv_f1), f3(ab.no_size_features.test_f1), f3(ab.no_size_features.precision), f3(ab.no_size_features.recall), pct(ab.no_size_features.fpr), ab.no_size_features.fixtures_pass],
+], [4, 1.6, 1.4, 1.5, 1.4, 1.2, 1.8], "Ablation: page-size features (dataset shortcut)", { size: 17, highlight: (r) => String(r[0]).includes("served") }));
 body.push(P("Findings from the error analysis:"));
 hist.findings.forEach((f) => body.push(bullet(f)));
 body.push(P([`The final error list (reports/errors.csv) contains ${ev.errors.false_positives} false positives and ${ev.errors.false_negatives} false negatives on the test set, each with the rules that fired and the model's top contributions. `,
@@ -273,7 +292,7 @@ body.push(P(`Full decision latency (parse → features → rules → model → d
 // 7 Demo / UI
 body.push(H1("7. Demonstration"));
 body.push(P("The illustrative scenario from the brief is scripted end to end (scripts/record_demo.py) and recorded as a captioned video (dist/demo/phishlens_demo.mp4). Selected frames:"));
-facts.screens.forEach((s) => body.push(...image(s.file, 560, s.caption)));
+facts.screens.forEach((s) => body.push(...image(s.file, 470, s.caption)));
 
 // 8 Limitations, ethics, conclusion
 body.push(H1("8. Limitations"));
@@ -296,6 +315,7 @@ body.push(H1("9. Ethics statement"));
 body.push(H1("10. Conclusion"));
 body.push(P(`PhishLens meets the six functional requirements and the security requirements of the brief as a working, locally runnable system. Its main lesson came from real data: rules written for classic phishing kits caught few modern pages and fired on many benign ones, while error analysis on PhreshPhish revealed the patterns that matter today — free hosting platforms, brand names and misspellings in hosts, and wallet seed-phrase requests. Feeding those findings back raised F1 from ${f3(hist.iterations[0].f1)} to ${f3(served.f1)} while every decision stays explainable and reproducible.`));
 body.push(H1("References"));
+numRef = "num-refs";
 [
   "T. Dalton et al., \"PhreshPhish: A Real-World, High-Quality, Large-Scale Phishing Website Dataset and Benchmark,\" arXiv:2507.10854, 2025. Dataset: huggingface.co/datasets/phreshphish/phreshphish (CC BY 4.0).",
   "A. Saabas, \"Interpreting random forests,\" 2014 (path decomposition of tree predictions).",
@@ -321,8 +341,9 @@ const doc = new Document({
   numbering: { config: [
     { reference: "bullets", levels: [{ level: 0, format: LevelFormat.BULLET, text: "•", alignment: AlignmentType.LEFT,
       style: { paragraph: { indent: { left: 540, hanging: 270 } } } }] },
-    { reference: "numbers", levels: [{ level: 0, format: LevelFormat.DECIMAL, text: "%1.", alignment: AlignmentType.LEFT,
-      style: { paragraph: { indent: { left: 540, hanging: 340 } } } }] },
+    ...["num-objectives", "num-sequence", "num-refs"].map((reference) => ({ reference, levels: [{ level: 0,
+      format: LevelFormat.DECIMAL, text: reference === "num-refs" ? "[%1]" : "%1.", alignment: AlignmentType.LEFT,
+      style: { paragraph: { indent: { left: 540, hanging: 400 } } } }] })),
   ] },
   features: { updateFields: true },
   sections: [
@@ -339,4 +360,5 @@ const doc = new Document({
 });
 
 const out = R("docs/report/PhishLens_Final_Report.docx");
+fs.writeFileSync(R("docs/report/headings.json"), JSON.stringify(HEADINGS));
 Packer.toBuffer(doc).then((buf) => { fs.writeFileSync(out, buf); console.log("wrote", out); });

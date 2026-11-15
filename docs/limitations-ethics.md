@@ -1,8 +1,11 @@
 # Limitations and ethics
 
 ## Limitations
-* **Synthetic starter data.** The bundled generator produces easy, template-based pages; metrics on it are
-  optimistic. Final numbers must come from the instructor-approved dataset.
+* **One dataset, one period.** Numbers come from a 2000-page sample of PhreshPhish (2024–2025, English).
+  Other periods, languages or targeted phishing may behave differently.
+* **Dataset shortcut.** In the data, benign pages are big full websites and phishing pages are small, so models
+  learn "small page = phishing". We serve a model without pure page-size features (equal cross-validated F1),
+  but minimal legitimate pages (e.g. a bare intranet login) can still be scored *suspicious*; analysts see why.
 * **Static analysis only.** Pages are never executed, so content built entirely by JavaScript at runtime,
   or pages that differ per visitor, can be missed. This is a deliberate safety trade-off.
 * **Visual-risk features are markup-based** (external logo/favicon, brand in title, hidden elements), not
