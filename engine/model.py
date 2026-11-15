@@ -1,9 +1,13 @@
 """ML classifier (FR-4).
 
-A StandardScaler + LogisticRegression pipeline. We use logistic regression on purpose:
-each feature's contribution to a decision is coef * scaled_value, which gives an exact,
-explainable breakdown without extra libraries. (Member B can compare against a
-RandomForest in scripts/evaluate.py, but the served model must stay explainable.)
+Two explainable model families are supported; scripts/evaluate.py picks the better one by
+5-fold cross-validation on the training split only:
+
+* LogisticRegression (with StandardScaler): contribution of feature i = coef_i * scaled_x_i
+  (log-odds units). Sum of contributions + intercept = the model's log-odds exactly.
+* RandomForest: per-feature contributions via path decomposition (Saabas / "treeinterpreter"):
+  walking each tree from root to leaf, the change in P(phishing) at every split is credited to
+  the split feature. Bias + sum of contributions = the forest's probability exactly.
 
 Integrity: joblib files are pickles and can run code when loaded, so we only load a
 model whose SHA-256 matches the value recorded in its metadata file next to it, and
@@ -19,6 +23,7 @@ from pathlib import Path
 
 import joblib
 import numpy as np
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, precision_score, recall_score
 from sklearn.model_selection import train_test_split
@@ -45,16 +50,57 @@ class LoadedModel:
         order = self.meta["feature_order"]
         x = np.array([[float(features.values[n]) for n in order]])
         prob = float(self.pipeline.predict_proba(x)[0, 1])
-        scaler: StandardScaler = self.pipeline.named_steps["scaler"]
-        clf: LogisticRegression = self.pipeline.named_steps["clf"]
-        contrib = (scaler.transform(x)[0]) * clf.coef_[0]
+        contrib, unit = explain_contributions(self.pipeline, x)
         ranked = sorted(zip(order, contrib, x[0]), key=lambda t: abs(t[1]), reverse=True)
         top = [
-            {"feature": name, "value": float(val), "contribution": round(float(c), 4),
+            {"feature": name, "value": round(float(val), 4), "contribution": round(float(c), 4),
              "direction": "towards phishing" if c > 0 else "towards benign"}
             for name, c, val in ranked[:top_k] if abs(c) > 1e-6
         ]
-        return {"probability": round(prob, 4), "model_version": self.version, "top_features": top}
+        return {"probability": round(prob, 4), "model_version": self.version, "algorithm": self.meta.get("algorithm"),
+                "contribution_unit": unit, "top_features": top}
+
+
+def explain_contributions(pipe, x: np.ndarray) -> tuple[np.ndarray, str]:
+    """Per-feature contributions for one sample (shape (1, n_features))."""
+    clf = pipe.named_steps["clf"]
+    if isinstance(clf, LogisticRegression):
+        scaler: StandardScaler = pipe.named_steps["scaler"]
+        return scaler.transform(x)[0] * clf.coef_[0], "log-odds"
+    if isinstance(clf, RandomForestClassifier):
+        return _forest_contributions(clf, pipe.named_steps["scaler"].transform(x)[0]), "probability"
+    raise TypeError(f"no explainer for {type(clf).__name__}")
+
+
+def _forest_contributions(forest: RandomForestClassifier, x: np.ndarray) -> np.ndarray:
+    pos = list(forest.classes_).index(1)
+    total = np.zeros(x.shape[0])
+    for est in forest.estimators_:
+        tree = est.tree_
+        values = tree.value[:, 0, :]
+        p1 = values[:, pos] / values.sum(axis=1)
+        node = 0
+        while tree.children_left[node] != -1:
+            feat = tree.feature[node]
+            child = tree.children_left[node] if x[feat] <= tree.threshold[node] else tree.children_right[node]
+            total[feat] += p1[child] - p1[node]
+            node = child
+    return total / len(forest.estimators_)
+
+
+def make_pipeline(algorithm: str, seed: int = 42) -> Pipeline:
+    if algorithm == "random_forest":
+        clf = RandomForestClassifier(n_estimators=300, min_samples_leaf=2, class_weight="balanced",
+                                     random_state=seed, n_jobs=-1)
+    else:
+        clf = LogisticRegression(max_iter=5000, class_weight="balanced", random_state=seed)
+    return Pipeline([("scaler", StandardScaler()), ("clf", clf)])
+
+
+ALGORITHM_LABELS = {
+    "logistic_regression": "StandardScaler + LogisticRegression(class_weight=balanced)",
+    "random_forest": "RandomForest(300 trees, min_samples_leaf=2, class_weight=balanced) + path-decomposition explanations",
+}
 
 
 def _sha256(path: Path) -> str:

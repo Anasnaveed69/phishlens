@@ -152,10 +152,25 @@ def init_db() -> None:
         conn.executescript(SCHEMA)
         row = conn.execute("SELECT COUNT(*) AS n FROM config_versions").fetchone()
         if row["n"] == 0:
+            cfg, reason = _initial_config()
             conn.execute(
                 "INSERT INTO config_versions (config_json, changed_by, reason, created_at) VALUES (?, ?, ?, ?)",
-                (json.dumps(DEFAULT_CONFIG), None, "initial defaults", now_iso()),
+                (json.dumps(cfg), None, reason, now_iso()),
             )
+
+
+def _initial_config() -> tuple[dict, str]:
+    """Use the thresholds calibrated by scripts/evaluate.py (stored in the model metadata) when a
+    trained model is present; otherwise fall back to the hand-set defaults."""
+    meta_file = settings.model_path.with_suffix(".meta.json")
+    try:
+        meta = json.loads(meta_file.read_text(encoding="utf-8"))
+        rec = meta.get("recommended_config")
+        if rec and {"phishing_threshold", "suspicious_threshold", "ml_weight"} <= set(rec):
+            return {**DEFAULT_CONFIG, **rec}, f"calibrated for model {meta.get('version')} (cross-validation)"
+    except (OSError, ValueError):
+        pass
+    return dict(DEFAULT_CONFIG), "initial defaults"
 
 
 def current_config(conn: sqlite3.Connection) -> tuple[int, dict]:

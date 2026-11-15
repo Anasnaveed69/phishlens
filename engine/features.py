@@ -18,20 +18,46 @@ from urllib.parse import urljoin, urlsplit
 
 from bs4 import BeautifulSoup
 
-FEATURE_VERSION = "features-1.1"
+FEATURE_VERSION = "features-2.0"
 
 BRANDS = [
     "paypal", "microsoft", "office365", "outlook", "apple", "icloud", "google", "gmail", "amazon",
     "netflix", "facebook", "instagram", "whatsapp", "linkedin", "dropbox", "docusign", "dhl", "fedex",
     "hbl", "meezan", "ubl", "jazzcash", "easypaisa", "binance", "coinbase", "chase", "wellsfargo",
+    # added after the PhreshPhish error analysis (crypto wallets, SaaS, delivery, gaming)
+    "metamask", "trezor", "ledger", "trustwallet", "kraken", "bybit", "okx", "uniswap", "opensea",
+    "canva", "adobe", "sharepoint", "onedrive", "wetransfer", "roblox", "discord",
+    "usps", "royalmail", "evri", "verizon", "xfinity", "spotify", "airbnb", "ebay",
+    # (left out on purpose: ups, att, zoom, steam, booking, telegram — too common as ordinary words)
 ]
+# Hosting, site-builder, tunnel and file-sharing platforms where anyone can publish a page in
+# minutes; phishing kits are heavily hosted there (PhreshPhish error analysis, Nov 2026).
+FREE_HOSTING = (
+    "pages.dev", "workers.dev", "vercel.app", "netlify.app", "web.app", "firebaseapp.com", "github.io",
+    "gitlab.io", "glitch.me", "herokuapp.com", "onrender.com", "repl.co", "replit.app", "fly.dev",
+    "blogspot.", "wordpress.com", "weebly.com", "wixsite.com", "wix.com", "webflow.io", "framer.app",
+    "godaddysites.com", "square.site", "sites.google.com", "carrd.co", "000webhostapp.com", "r2.dev",
+    "backblazeb2.com", "s3.amazonaws.com", "storage.googleapis.com", "blob.core.windows.net", "ipfs.",
+    "ngrok", "trycloudflare.com", "loca.lt", "azurewebsites.net", "firebasestorage.googleapis.com",
+    "dweb.link", "fleek.co", "surge.sh", "translate.goog", "notion.site", "typedream.app", "mystrikingly.com",
+)
+SHORTENERS = ("bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly", "is.gd", "cutt.ly", "rb.gy", "shorturl.at",
+              "surl.", "t.ly", "tiny.cc", "rebrand.ly", "s.id", "qrco.de", "ct.sendgrid.net", "click.",
+              "l.ead.me", "linktr.ee")
+TRACKER_IFRAME = re.compile(r"googletagmanager|doubleclick|facebook\.com/tr|bat\.bing|hotjar|youtube|vimeo|"
+                            r"recaptcha|stripe|paypal\.com/sdk|hubspot|adsrvr|criteo|taboola|outbrain", re.I)
+LOGIN_TERMS = ["sign in", "log in", "login", "signin", "verify", "password", "account", "wallet", "seed phrase",
+               "recovery phrase", "connect wallet", "secret phrase", "private key"]
 URGENCY_TERMS = [
     "urgent", "immediately", "suspended", "suspend", "locked", "unusual activity", "verify your account",
     "within 24 hours", "confirm your identity", "account will be closed", "action required", "unauthorized",
 ]
 CREDENTIAL_TERMS = ["password", "passcode", "pin", "cvv", "card number", "otp", "social security", "cnic"]
 SUSPICIOUS_URL_TOKENS = ["login", "signin", "verify", "secure", "account", "update", "banking", "confirm", "wallet", "webscr"]
-SUSPICIOUS_TLDS = {"tk", "ml", "ga", "cf", "gq", "xyz", "top", "zip", "click", "country", "kim", "work"}
+# Most-abused TLDs (Spamhaus / Interisle phishing landscape reports) plus the ones in our error analysis.
+SUSPICIOUS_TLDS = {"tk", "ml", "ga", "cf", "gq", "xyz", "top", "zip", "mov", "click", "country", "kim", "work",
+                   "shop", "cyou", "icu", "buzz", "sbs", "cfd", "rest", "bond", "lol", "live", "online", "site",
+                   "store", "cc", "support", "help", "monster", "quest", "best", "beauty", "hair", "skin"}
 OBFUSCATION_PATTERNS = [r"\beval\s*\(", r"\batob\s*\(", r"\bunescape\s*\(", r"fromCharCode", r"document\.write\s*\("]
 _MULTI_PART_SLD = {"co", "com", "org", "net", "gov", "edu", "ac"}
 
@@ -47,6 +73,10 @@ NUMERIC_FEATURES = [
     "external_favicon", "external_logo", "title_brand_mismatch", "hidden_elements",
     # added in features-1.1
     "form_action_ip", "data_uri_count", "lookalike_brand_host", "brand_in_subdomain", "minimal_login_page",
+    # added in features-2.0 (real-data error analysis)
+    "free_hosting", "url_shortener", "brand_in_host", "brand_typo_host", "host_entropy", "digits_in_host",
+    "query_length", "num_inputs", "hidden_inputs", "email_inputs", "login_terms", "html_length_log",
+    "title_length", "external_resource_ratio", "tracker_iframes", "brand_asset_hotlink", "wallet_seed_request",
 ]
 _LOOKALIKE = str.maketrans({"0": "o", "1": "l", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s"})
 
@@ -135,6 +165,25 @@ def url_features(url: str | None) -> tuple[dict[str, float], dict[str, list[str]
     f["lookalike_brand_host"] = int(bool(looks))
     if looks:
         ev["lookalike_brand_host"] = [f"'{host}' imitates '{looks[0]}'"]
+    f["free_hosting"] = int(any(h in host for h in FREE_HOSTING))
+    if f["free_hosting"]:
+        ev["free_hosting"] = [host]
+    f["url_shortener"] = int(any(host == x or host.endswith("." + x) or (x.endswith(".") and x in host)
+                                 for x in SHORTENERS))
+    if f["url_shortener"]:
+        ev["url_shortener"] = [host]
+    tokens = [t for t in re.split(r"[.\-_]", host) if t]
+    on_host = [b for b in BRANDS if len(b) >= 4 and any(b in t for t in tokens) and not _domain_owns_brand(domain, b)]
+    f["brand_in_host"] = int(bool(on_host))
+    if on_host:
+        ev["brand_in_host"] = [f"brand '{on_host[0]}' in host '{host}' (not the brand's domain)"]
+    typo = _brand_typo(tokens, domain)
+    f["brand_typo_host"] = int(bool(typo))
+    if typo:
+        ev["brand_typo_host"] = [f"'{typo[0]}' looks like '{typo[1]}'"]
+    f["host_entropy"] = round(_entropy(host.replace(".", "")), 3) if host else 0.0
+    f["digits_in_host"] = sum(c.isdigit() for c in host)
+    f["query_length"] = len(parts.query)
     sub = host[: -len(domain)].rstrip(".") if domain and host.endswith(domain) else ""
     in_sub = [b for b in BRANDS if len(b) >= 4 and re.search(rf"(^|[.-]){re.escape(b)}([.-]|$)", sub)
               and not _domain_owns_brand(domain, b)]
@@ -184,10 +233,21 @@ def extract(html: str, url: str | None = None) -> FeatureResult:
     if data_uris:
         evidence["data_uri_count"] = [_snippet(d, 60) for d in data_uris[:3]]
 
+    inputs = soup.find_all("input")
+    itype = [(i.get("type") or "text").lower() for i in inputs]
+    values["num_inputs"] = len(inputs)
+    values["hidden_inputs"] = itype.count("hidden")
+    values["email_inputs"] = itype.count("email") + sum(
+        1 for i in inputs if re.search(r"e-?mail|user", (i.get("name") or "") + (i.get("id") or ""), re.I))
+
     # --- iframes -----------------------------------------------------------
     iframes = soup.find_all("iframe")
     values["num_iframes"] = len(iframes)
-    hidden = [i for i in iframes if _looks_hidden(i)]
+    trackers = [i for i in iframes if TRACKER_IFRAME.search(i.get("src") or "")]
+    values["tracker_iframes"] = len(trackers)
+    # Invisible analytics/consent iframes (Google Tag Manager etc.) are normal on real sites:
+    # in rules-1.1 they made R06 fire on 64% of benign pages, so they no longer count as hidden.
+    hidden = [i for i in iframes if _looks_hidden(i) and i not in trackers]
     values["hidden_iframes"] = len(hidden)
     if hidden:
         evidence["hidden_iframes"] = [_snippet(i.get("src") or "(no src)") for i in hidden[:3]]
@@ -218,6 +278,21 @@ def extract(html: str, url: str | None = None) -> FeatureResult:
     if refresh is not None:
         evidence["has_meta_refresh"] = [_snippet(refresh.get("content", ""))]
 
+    resources = [t.get("src") or t.get("href") for t in soup.find_all(["img", "script", "link"])
+                 if (t.get("src") or t.get("href"))]
+    ext_res = [r for r in resources if _is_external(r, page_domain, url)]
+    values["external_resource_ratio"] = round(len(ext_res) / len(resources), 3) if resources else 0.0
+    hotlinks = []
+    for r in ext_res:
+        rdom = registrable_domain(_host_of(r, url)) or ""
+        for b in BRANDS:
+            if _domain_owns_brand(rdom, b) and not (page_domain and _domain_owns_brand(page_domain, b)):
+                hotlinks.append(f"{b}: {_snippet(r, 80)}")
+                break
+    values["brand_asset_hotlink"] = int(bool(hotlinks))
+    if hotlinks:
+        evidence["brand_asset_hotlink"] = hotlinks[:3]
+
     # --- text --------------------------------------------------------------
     for tag in soup(["script", "style", "noscript"]):
         tag.decompose()
@@ -226,9 +301,13 @@ def extract(html: str, url: str | None = None) -> FeatureResult:
     lower = (title + " " + text).lower()
     brands = [b for b in BRANDS if re.search(rf"\b{re.escape(b)}\b", lower)]
     values["brand_mentions"] = len(brands)
-    mismatch = [b for b in brands if page_domain and not _domain_owns_brand(page_domain, b)]
-    # Brand appears in the page but the page's own domain belongs to someone else.
-    values["brand_domain_mismatch"] = int(bool(mismatch) and len(mismatch) == len(brands))
+    prominent = " ".join([title] + [t.get_text(" ", strip=True) for t in soup.find_all(["h1", "h2"])][:6]
+                         + [i.get("alt", "") for i in soup.find_all("img")][:20]).lower()
+    prominent_brands = [b for b in brands if re.search(rf"\b{re.escape(b)}\b", prominent)]
+    mismatch = [b for b in prominent_brands if page_domain and not _domain_owns_brand(page_domain, b)]
+    # A brand is the *headline* of the page (title, heading or logo) but the domain belongs to someone else.
+    # (features-1.x used any mention in body text, which flagged news and "pay with PayPal" pages.)
+    values["brand_domain_mismatch"] = int(bool(mismatch) and len(mismatch) == len(prominent_brands))
     if values["brand_domain_mismatch"]:
         evidence["brand_domain_mismatch"] = [f"brand '{b}' on domain '{page_domain}'" for b in mismatch[:3]]
     urg = [t for t in URGENCY_TERMS if t in lower]
@@ -240,7 +319,17 @@ def extract(html: str, url: str | None = None) -> FeatureResult:
     if cred:
         evidence["credential_terms"] = cred[:5]
     values["text_length_log"] = round(math.log1p(len(text)), 3)
-    values["minimal_login_page"] = int(values["num_password_inputs"] > 0 and len(text) < 600)
+    values["minimal_login_page"] = int(values["num_password_inputs"] > 0 and len(text) < 600 and len(links) < 3)
+    lt = [t for t in LOGIN_TERMS if t in lower]
+    values["login_terms"] = len(lt)
+    if lt:
+        evidence["login_terms"] = lt[:5]
+    seed = re.search(r"seed phrase|recovery phrase|secret phrase|12[- ]word|24[- ]word|private key|mnemonic", lower)
+    values["wallet_seed_request"] = int(bool(seed))
+    if seed:
+        evidence["wallet_seed_request"] = [seed.group(0)]
+    values["html_length_log"] = round(math.log1p(len(html)), 3)
+    values["title_length"] = len(title)
 
     # --- visual-risk (derived from markup only) ----------------------------
     icon = soup.find("link", rel=lambda r: r and "icon" in (" ".join(r) if isinstance(r, list) else r).lower())
@@ -265,6 +354,37 @@ def extract(html: str, url: str | None = None) -> FeatureResult:
     missing = [n for n in NUMERIC_FEATURES if n not in values]
     assert not missing, f"feature(s) not computed: {missing}"
     return FeatureResult(values=values, evidence=evidence, page_domain=page_domain, brands_found=brands)
+
+
+def _entropy(text: str) -> float:
+    if not text:
+        return 0.0
+    counts = {c: text.count(c) for c in set(text)}
+    return -sum((n / len(text)) * math.log2(n / len(text)) for n in counts.values())
+
+
+def _levenshtein(a: str, b: str) -> int:
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        for j, cb in enumerate(b, 1):
+            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb)))
+        prev = cur
+    return prev[-1]
+
+
+def _brand_typo(tokens: list[str], domain: str) -> tuple[str, str] | None:
+    """Host token within edit distance 1–2 of a brand (trzor~trezor, liive~live, paypai~paypal)."""
+    for t in tokens:
+        if len(t) < 5:
+            continue
+        for b in BRANDS:
+            if len(b) < 5 or abs(len(t) - len(b)) > 2 or b in t:
+                continue
+            d = _levenshtein(t, b)
+            if 1 <= d <= (1 if len(b) < 7 else 2) and not _domain_owns_brand(domain, b):
+                return t, b
+    return None
 
 
 def _is_ip(host: str | None) -> bool:

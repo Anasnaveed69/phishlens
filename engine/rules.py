@@ -12,7 +12,7 @@ from typing import Callable
 
 from .features import FeatureResult
 
-RULESET_VERSION = "rules-1.1"
+RULESET_VERSION = "rules-2.0"
 
 
 @dataclass(frozen=True)
@@ -42,16 +42,16 @@ RULES: list[Rule] = [
     # a plain article that merely mentions a brand was a false positive in rules-1.0.
     Rule("R04", "Brand impersonation", 0.50, "high",
          lambda f: _v("brand_domain_mismatch")(f) == 1
-         and (_v("num_password_inputs")(f) > 0 or _v("credential_terms")(f) > 0),
-         "The page names a well-known brand and asks for credentials, but is not hosted on that brand's domain.",
-         "brand_domain_mismatch"),
+         and (_v("num_password_inputs")(f) > 0 or _v("credential_terms")(f) > 0 or _v("wallet_seed_request")(f) == 1),
+         "The page's title/heading/logo claims a well-known brand and asks for credentials, "
+         "but it is not hosted on that brand's domain.", "brand_domain_mismatch"),
     Rule("R05", "Credential request with urgency language", 0.40, "medium",
          lambda f: _v("credential_terms")(f) > 0 and _v("urgency_terms")(f) > 0,
          "The page pressures the user ('urgent', 'suspended', ...) while asking for credentials.", "urgency_terms"),
-    Rule("R06", "Hidden iframe", 0.30, "medium", lambda f: _v("hidden_iframes")(f) > 0,
-         "The page contains an invisible iframe.", "hidden_iframes"),
-    Rule("R07", "Obfuscated JavaScript", 0.30, "medium", lambda f: _v("obfuscation_hits")(f) >= 2,
-         "Inline script uses several obfuscation functions (eval/atob/unescape/...).", "obfuscation_hits"),
+    Rule("R06", "Hidden iframe", 0.20, "low", lambda f: _v("hidden_iframes")(f) > 0,
+         "The page contains an invisible iframe that is not a known analytics/consent frame.", "hidden_iframes"),
+    Rule("R07", "Obfuscated JavaScript", 0.20, "low", lambda f: _v("obfuscation_hits")(f) >= 3,
+         "Inline script combines several obfuscation functions (eval/atob/unescape/...).", "obfuscation_hits"),
     Rule("R08", "Suspicious top-level domain", 0.20, "low", lambda f: _v("suspicious_tld")(f) == 1,
          "The domain uses a TLD that is frequently abused for phishing.", "suspicious_tld"),
     Rule("R09", "Excessive subdomains", 0.20, "low", lambda f: _v("num_subdomains")(f) >= 3,
@@ -61,9 +61,11 @@ RULES: list[Rule] = [
     Rule("R11", "Login page without HTTPS", 0.25, "medium",
          lambda f: _v("num_password_inputs")(f) > 0 and _v("uses_https")(f) == 0 and _v("url_length")(f) > 0,
          "A password field is served over plain HTTP."),
-    Rule("R12", "Brand logo or favicon loaded from elsewhere", 0.25, "low",
-         lambda f: _v("external_logo")(f) == 1 or _v("external_favicon")(f) == 1,
-         "The logo/favicon is pulled from a different domain (typical of cloned pages).", "external_logo"),
+    Rule("R12", "Brand assets hot-linked from the real brand", 0.35, "medium",
+         lambda f: _v("brand_asset_hotlink")(f) == 1,
+         "Images/scripts are loaded directly from a brand's own servers by a site that is not the brand "
+         "(cloned pages do this; rules-1.x counted any CDN and fired on 36% of benign pages).",
+         "brand_asset_hotlink"),
     Rule("R13", "Brand in title but not in domain", 0.25, "low", lambda f: _v("title_brand_mismatch")(f) == 1,
          "The page title claims a brand that does not match the host.", "title_brand_mismatch"),
     Rule("R14", "Meta-refresh redirect", 0.15, "low", lambda f: _v("has_meta_refresh")(f) == 1,
@@ -86,7 +88,25 @@ RULES += [
          "A brand appears as a subdomain of someone else's domain (e.g. paypal.com.account-check.info).",
          "brand_in_subdomain"),
     Rule("R20", "Bare login page", 0.20, "low", lambda f: _v("minimal_login_page")(f) == 1,
-         "The page is almost nothing but a password form, with very little other content."),
+         "The page is almost nothing but a password form, with very little text and no navigation."),
+    Rule("R21", "Free / anonymous hosting platform", 0.20, "low", lambda f: _v("free_hosting")(f) == 1,
+         "The page is hosted on a platform where anyone can publish instantly (pages.dev, vercel.app, "
+         "blogspot, storage buckets...).", "free_hosting"),
+    Rule("R22", "Link shortener or redirect service", 0.30, "medium", lambda f: _v("url_shortener")(f) == 1,
+         "The URL goes through a shortener/redirect service that hides the final destination.", "url_shortener"),
+    Rule("R23", "Brand name in an unrelated host", 0.50, "high",
+         lambda f: _v("brand_in_host")(f) == 1 and _v("brand_in_subdomain")(f) == 0,
+         "A brand name is part of the host name, but the domain does not belong to that brand "
+         "(e.g. metamasklogs.pages.dev).", "brand_in_host"),
+    Rule("R24", "Misspelled brand in host", 0.50, "high", lambda f: _v("brand_typo_host")(f) == 1,
+         "The host contains a near-miss spelling of a brand (e.g. trzor for trezor).", "brand_typo_host"),
+    Rule("R25", "Wallet recovery phrase requested", 0.60, "high", lambda f: _v("wallet_seed_request")(f) == 1,
+         "The page asks for a wallet seed/recovery phrase or private key; no legitimate site does this.",
+         "wallet_seed_request"),
+    Rule("R26", "Login page on free hosting", 0.40, "high",
+         lambda f: _v("free_hosting")(f) == 1 and (_v("num_password_inputs")(f) > 0 or _v("login_terms")(f) >= 2),
+         "A sign-in / wallet page is served from a free hosting platform instead of the service's own domain.",
+         "login_terms"),
 ]
 
 RULES_BY_ID = {r.id: r for r in RULES}
