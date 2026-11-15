@@ -134,10 +134,40 @@ def test_rules_only_mode_when_no_model():
     assert r["versions"]["rules"] and r["thresholds"]["phishing"] == 0.7  # reproducibility data stored
 
 
-def test_threshold_change_changes_decision():
+def test_r04_no_longer_flags_articles_that_mention_brands():
+    """Regression for the rules-1.0 false positive documented in docs/test-plan.md (T4)."""
     html = fixture_bytes("edge_brand_mention_article.html").decode()
-    url = "https://security-blog.example.org/fake-payment-pages"
-    strict = {**CFG, "suspicious_threshold": 0.3}
-    assert analyze(html, url, CFG, None)["decision"] == "suspicious"   # rule R04 alone = 0.5
-    assert analyze(html, url, {**CFG, "disabled_rules": ["R04"]}, None)["decision"] == "benign"
-    assert analyze(html, url, strict, None)["decision"] == "suspicious"
+    r = analyze(html, "https://security-blog.example.org/fake-payment-pages", CFG, None)
+    assert r["decision"] == "benign" and "R04" not in {f["id"] for f in r["rules"]["fired"]}
+
+
+def test_threshold_change_changes_decision():
+    # Plain-HTTP bare login page: R11 (0.25) + R20 (0.20) -> noisy-OR 0.40 = exactly "suspicious".
+    html = "<html><body><form action='/s'><input type='password' name='p'></form></body></html>"
+    url = "http://intranet.example.com/login"
+    assert analyze(html, url, CFG, None)["decision"] == "suspicious"
+    assert analyze(html, url, {**CFG, "disabled_rules": ["R11"]}, None)["decision"] == "benign"
+    assert analyze(html, url, {**CFG, "suspicious_threshold": 0.5}, None)["decision"] == "benign"
+
+
+@pytest.mark.parametrize("url,feature", [
+    ("http://paypa1-login.com/x", "lookalike_brand_host"),
+    ("http://rnicrosoft-support.net/", "lookalike_brand_host"),
+    ("http://paypal.com.account-check.info/login", "brand_in_subdomain"),
+])
+def test_lookalike_and_subdomain_brand(url, feature):
+    fr = extract("<html><body>hi</body></html>", url)
+    assert fr.values[feature] == 1
+
+
+def test_real_brand_domains_not_lookalike():
+    for url in ("https://www.paypal.com/signin", "https://login.microsoftonline.com/", "https://www.meezanbank.com/"):
+        fr = extract("<html><body>hi</body></html>", url)
+        assert fr.values["lookalike_brand_host"] == 0 and fr.values["brand_in_subdomain"] == 0, url
+
+
+def test_form_to_ip_and_data_uri():
+    html = ("<html><body><form action='http://45.9.1.2/p.php'><input type=password></form>"
+            "<iframe src='data:text/html;base64,PGgxPmhpPC9oMT4='></iframe></body></html>")
+    fr = extract(html, "https://a.example.com/")
+    assert fr.values["form_action_ip"] == 1 and fr.values["data_uri_count"] == 1

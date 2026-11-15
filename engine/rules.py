@@ -12,7 +12,7 @@ from typing import Callable
 
 from .features import FeatureResult
 
-RULESET_VERSION = "rules-1.0"
+RULESET_VERSION = "rules-1.1"
 
 
 @dataclass(frozen=True)
@@ -38,8 +38,13 @@ RULES: list[Rule] = [
     Rule("R03", "Password form posts to another domain", 0.60, "high",
          lambda f: _v("num_password_inputs")(f) > 0 and _v("external_form_action")(f) > 0,
          "A form asking for a password sends its data to a different domain.", "external_form_action"),
-    Rule("R04", "Brand impersonation", 0.50, "high", lambda f: _v("brand_domain_mismatch")(f) == 1,
-         "The page names a well-known brand but is not hosted on that brand's domain.", "brand_domain_mismatch"),
+    # rules-1.1: R04 now needs a credential context (form, password field or credential words);
+    # a plain article that merely mentions a brand was a false positive in rules-1.0.
+    Rule("R04", "Brand impersonation", 0.50, "high",
+         lambda f: _v("brand_domain_mismatch")(f) == 1
+         and (_v("num_password_inputs")(f) > 0 or _v("credential_terms")(f) > 0),
+         "The page names a well-known brand and asks for credentials, but is not hosted on that brand's domain.",
+         "brand_domain_mismatch"),
     Rule("R05", "Credential request with urgency language", 0.40, "medium",
          lambda f: _v("credential_terms")(f) > 0 and _v("urgency_terms")(f) > 0,
          "The page pressures the user ('urgent', 'suspended', ...) while asking for credentials.", "urgency_terms"),
@@ -66,6 +71,22 @@ RULES: list[Rule] = [
     Rule("R15", "Mostly dead links", 0.15, "low",
          lambda f: _v("num_links")(f) >= 3 and _v("null_link_ratio")(f) >= 0.6,
          "Most links go nowhere ('#' or javascript:), common in phishing kits."),
+]
+
+RULES += [
+    Rule("R16", "Form submits to an IP address", 0.45, "high", lambda f: _v("form_action_ip")(f) > 0,
+         "A form sends its data straight to a raw IP address.", "form_action_ip"),
+    Rule("R17", "Embedded data: / blob: document", 0.30, "medium", lambda f: _v("data_uri_count")(f) > 0,
+         "The page embeds a whole document via a data:/blob: URI, a common way to hide phishing content.",
+         "data_uri_count"),
+    Rule("R18", "Look-alike brand domain", 0.50, "high", lambda f: _v("lookalike_brand_host")(f) == 1,
+         "The host imitates a brand with swapped characters (e.g. 0 for o, rn for m).", "lookalike_brand_host"),
+    Rule("R19", "Brand name in an unrelated domain's subdomain", 0.45, "high",
+         lambda f: _v("brand_in_subdomain")(f) == 1,
+         "A brand appears as a subdomain of someone else's domain (e.g. paypal.com.account-check.info).",
+         "brand_in_subdomain"),
+    Rule("R20", "Bare login page", 0.20, "low", lambda f: _v("minimal_login_page")(f) == 1,
+         "The page is almost nothing but a password form, with very little other content."),
 ]
 
 RULES_BY_ID = {r.id: r for r in RULES}

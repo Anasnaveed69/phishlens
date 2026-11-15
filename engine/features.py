@@ -18,7 +18,7 @@ from urllib.parse import urljoin, urlsplit
 
 from bs4 import BeautifulSoup
 
-FEATURE_VERSION = "features-1.0"
+FEATURE_VERSION = "features-1.1"
 
 BRANDS = [
     "paypal", "microsoft", "office365", "outlook", "apple", "icloud", "google", "gmail", "amazon",
@@ -45,7 +45,10 @@ NUMERIC_FEATURES = [
     "external_script_ratio", "has_meta_refresh", "obfuscation_hits", "disables_right_click",
     "brand_mentions", "brand_domain_mismatch", "urgency_terms", "credential_terms", "text_length_log",
     "external_favicon", "external_logo", "title_brand_mismatch", "hidden_elements",
+    # added in features-1.1
+    "form_action_ip", "data_uri_count", "lookalike_brand_host", "brand_in_subdomain", "minimal_login_page",
 ]
+_LOOKALIKE = str.maketrans({"0": "o", "1": "l", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s"})
 
 
 @dataclass
@@ -124,6 +127,20 @@ def url_features(url: str | None) -> tuple[dict[str, float], dict[str, list[str]
     if f["suspicious_tld"]:
         ev["suspicious_tld"] = ["." + tld]
     f["path_depth"] = len([p for p in parts.path.split("/") if p])
+    domain = registrable_domain(host) or ""
+    squashed = host.replace("-", "").replace(".", "")
+    normalized = squashed.translate(_LOOKALIKE).replace("rn", "m").replace("vv", "w")
+    looks = [b for b in BRANDS if len(b) >= 4 and b in normalized and b not in squashed
+             and not _domain_owns_brand(domain, b)]
+    f["lookalike_brand_host"] = int(bool(looks))
+    if looks:
+        ev["lookalike_brand_host"] = [f"'{host}' imitates '{looks[0]}'"]
+    sub = host[: -len(domain)].rstrip(".") if domain and host.endswith(domain) else ""
+    in_sub = [b for b in BRANDS if len(b) >= 4 and re.search(rf"(^|[.-]){re.escape(b)}([.-]|$)", sub)
+              and not _domain_owns_brand(domain, b)]
+    f["brand_in_subdomain"] = int(bool(in_sub))
+    if in_sub:
+        ev["brand_in_subdomain"] = [f"brand '{in_sub[0]}' in subdomain of '{domain}'"]
     try:
         f["has_port"] = int(parts.port is not None)
     except ValueError:
@@ -149,12 +166,23 @@ def extract(html: str, url: str | None = None) -> FeatureResult:
             bad_actions.append(action or "(empty)")
         elif action.lower().startswith("mailto:") or _is_external(action, page_domain, url):
             ext_actions.append(action)
+    ip_actions = [a for a in ext_actions if _is_ip(_host_of(a, url))]
+    values["form_action_ip"] = len(ip_actions)
+    if ip_actions:
+        evidence["form_action_ip"] = [_snippet(a) for a in ip_actions[:3]]
     values["external_form_action"] = len(ext_actions)
     values["empty_or_js_form_action"] = len(bad_actions)
     if ext_actions:
         evidence["external_form_action"] = [_snippet(a) for a in ext_actions[:3]]
     if bad_actions:
         evidence["empty_or_js_form_action"] = [_snippet(a) for a in bad_actions[:3]]
+
+    data_uris = [v for t in soup.find_all(["iframe", "object", "embed", "form", "a", "script"])
+                 for v in (t.get("src"), t.get("href"), t.get("action"), t.get("data"))
+                 if isinstance(v, str) and v.strip().lower().startswith(("data:text/html", "data:application", "blob:"))]
+    values["data_uri_count"] = len(data_uris)
+    if data_uris:
+        evidence["data_uri_count"] = [_snippet(d, 60) for d in data_uris[:3]]
 
     # --- iframes -----------------------------------------------------------
     iframes = soup.find_all("iframe")
@@ -212,6 +240,7 @@ def extract(html: str, url: str | None = None) -> FeatureResult:
     if cred:
         evidence["credential_terms"] = cred[:5]
     values["text_length_log"] = round(math.log1p(len(text)), 3)
+    values["minimal_login_page"] = int(values["num_password_inputs"] > 0 and len(text) < 600)
 
     # --- visual-risk (derived from markup only) ----------------------------
     icon = soup.find("link", rel=lambda r: r and "icon" in (" ".join(r) if isinstance(r, list) else r).lower())
@@ -236,6 +265,16 @@ def extract(html: str, url: str | None = None) -> FeatureResult:
     missing = [n for n in NUMERIC_FEATURES if n not in values]
     assert not missing, f"feature(s) not computed: {missing}"
     return FeatureResult(values=values, evidence=evidence, page_domain=page_domain, brands_found=brands)
+
+
+def _is_ip(host: str | None) -> bool:
+    if not host:
+        return False
+    try:
+        ipaddress.ip_address(host)
+        return True
+    except ValueError:
+        return False
 
 
 def _domain_owns_brand(domain: str, brand: str) -> bool:
