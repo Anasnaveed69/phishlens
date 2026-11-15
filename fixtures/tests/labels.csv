@@ -1,0 +1,7 @@
+filename,label,source_url
+benign_article.html,benign,https://news.example.com/food/weekend-recipes
+benign_bank_login.html,benign,https://www.hbl.com/login
+phish_brand_clone.html,phishing,http://paypal-secure-verify.tk/webscr/signin
+phish_ip_host.html,phishing,http://185.22.91.7/office365/login.php
+edge_brand_mention_article.html,benign,https://security-blog.example.org/fake-payment-pages
+edge_malformed.html,benign,https://legacy.example.com/old
