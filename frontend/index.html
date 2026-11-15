@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PhishLens</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="logo" aria-hidden="true">◎</span> PhishLens</div>
+    <nav id="nav" class="nav hidden" aria-label="Main">
+      <a href="#/analyze" data-perm="sample:write">Analyze</a>
+      <a href="#/history" data-perm="result:read">History</a>
+      <a href="#/dataset" data-perm="sample:write">Dataset</a>
+      <a href="#/admin" data-perm="config:read">Admin</a>
+    </nav>
+    <div id="who" class="who hidden">
+      <span id="who-name"></span> <span id="who-role" class="pill"></span>
+      <button id="logout" class="link">Sign out</button>
+    </div>
+  </header>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <main id="view" tabindex="-1">
+    <section class="card narrow">
+      <p>Loading…</p>
+      <noscript>PhishLens needs JavaScript enabled.</noscript>
+    </section>
+  </main>
+
+  <footer class="foot">PhishLens · local demo build · pages are parsed, never executed or fetched</footer>
+</body>
+</html>
