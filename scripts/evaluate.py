@@ -45,7 +45,7 @@ from sklearn.preprocessing import StandardScaler  # noqa: E402
 from app.config import settings  # noqa: E402
 from app.db import DEFAULT_CONFIG  # noqa: E402
 from engine import model as model_mod  # noqa: E402
-from engine.features import FEATURE_VERSION, NUMERIC_FEATURES, extract  # noqa: E402
+from engine.features import FEATURE_VERSION, NUMERIC_FEATURES, SIZE_FEATURES, extract  # noqa: E402
 from engine.pipeline import decide  # noqa: E402
 from engine.rules import RULES, RULESET_VERSION, evaluate as eval_rules  # noqa: E402
 
@@ -99,6 +99,8 @@ def main() -> None:
     ap.add_argument("--out", default=str(ROOT / "reports"))
     ap.add_argument("--no-save", action="store_true", help="don't overwrite models/model.joblib")
     ap.add_argument("--name", default=None, help="dataset name for the report")
+    ap.add_argument("--drop-size-features", action="store_true",
+                    help="train the model without pure page-size features (avoids the 'small page = phishing' shortcut)")
     ap.add_argument("--max-fpr", type=float, default=0.02, help="target false-positive rate for the phishing threshold")
     args = ap.parse_args()
 
@@ -108,7 +110,9 @@ def main() -> None:
     print(f"loading {data} ...")
     items, feat_times, skipped = load(data, args.limit)
     y = np.array([it["y"] for it in items])
-    X = np.array([it["fr"].vector() for it in items], dtype=float)
+    X_all = np.array([it["fr"].vector() for it in items], dtype=float)
+    USED = [f for f in NUMERIC_FEATURES if not (args.drop_size_features and f in SIZE_FEATURES)]
+    X = X_all[:, [NUMERIC_FEATURES.index(f) for f in USED]]
     idx = np.arange(len(items))
     tr, te = train_test_split(idx, test_size=args.test_size, random_state=args.seed, stratify=y)
 
@@ -179,7 +183,7 @@ def main() -> None:
     # ---- full-pipeline latency on test pages ------------------------------
     if hasattr(served.named_steps["clf"], "n_jobs"):
         served.named_steps["clf"].n_jobs = 1  # measure latency the way the app serves it
-    loaded = model_mod.LoadedModel(pipeline=served, meta={"version": "eval", "feature_order": NUMERIC_FEATURES})
+    loaded = model_mod.LoadedModel(pipeline=served, meta={"version": "eval", "feature_order": USED})
     from engine.pipeline import analyze
     lat = []
     for i in te[: min(len(te), 300)]:
@@ -203,7 +207,7 @@ def main() -> None:
                          "precision": round(on_ph / (on_ph + on_bn), 3) if on_ph + on_bn else None})
 
     # ---- error analysis for the served hybrid (T4) --------------------------
-    contrib_model = model_mod.LoadedModel(pipeline=served, meta={"version": "eval", "feature_order": NUMERIC_FEATURES})
+    contrib_model = model_mod.LoadedModel(pipeline=served, meta={"version": "eval", "feature_order": USED})
     errors = []
     pred_h = flag(hybrid, ts_best)  # errors = anything the served config does not flag / wrongly flags
     for k, i in enumerate(te):
@@ -232,8 +236,18 @@ def main() -> None:
     # ---- top global features (LR coefficients, RF importances) --------------
     lr_model = model_mod.make_pipeline("logistic_regression", args.seed).fit(X[tr], y[tr])
     coefs = lr_model.named_steps["clf"].coef_[0]
-    top_lr = sorted(zip(NUMERIC_FEATURES, coefs), key=lambda t: abs(t[1]), reverse=True)[:12]
-    top_rf = sorted(zip(NUMERIC_FEATURES, rf.named_steps['clf'].feature_importances_), key=lambda t: t[1], reverse=True)[:12]
+    top_lr = sorted(zip(USED, coefs), key=lambda t: abs(t[1]), reverse=True)[:12]
+    top_rf = sorted(zip(USED, rf.named_steps['clf'].feature_importances_), key=lambda t: t[1], reverse=True)[:12]
+
+    # ---- hand-written fixtures through the served configuration (generalisation check) ----
+    fixtures = []
+    fx = ROOT / "fixtures" / "tests"
+    for row in csv.DictReader((fx / "labels.csv").open(encoding="utf-8")):
+        r = analyze((fx / row["filename"]).read_text(encoding="utf-8"), row["source_url"] or None, recommended, loaded)
+        fixtures.append({"file": row["filename"], "expected": row["label"], "actual": r["decision"], "score": r["score"],
+                         "ml": r["ml"]["probability"], "rules": [f["id"] for f in r["rules"]["fired"]],
+                         "pass": (r["decision"] == "benign") == (row["label"] == "benign")})
+    print("fixtures:", [(f["file"], f["expected"], f["actual"], f["score"]) for f in fixtures])
 
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -245,6 +259,9 @@ def main() -> None:
         "config": recommended,
         "cross_validation": cv,
         "served_algorithm": served_algo,
+        "feature_order": USED,
+        "dropped_size_features": bool(args.drop_size_features),
+        "fixtures": fixtures,
         "results": results,
         "latency_full_pipeline": latency,
         "feature_extraction_ms": {"mean": round(statistics.mean(feat_times), 2),
@@ -268,7 +285,7 @@ def main() -> None:
             "algorithm_id": served_algo,
             "recommended_config": recommended,
             "cross_validation": cv,
-            "feature_version": FEATURE_VERSION, "feature_order": NUMERIC_FEATURES,
+            "feature_version": FEATURE_VERSION, "feature_order": USED,
             "trained_at": report["generated_at"], "n_train": int(len(tr)), "n_test": int(len(te)), "seed": args.seed,
             "dataset": f"{report['dataset']['name']} ({len(items)} pages)",
             "test_metrics": results["served@suspicious"], "sha256": model_mod._sha256(mp),
@@ -339,11 +356,11 @@ def charts(out: Path, yt, p_lr, p_rf, rules, hybrid, pred_h, coverage, top_lr) -
     plt.close(fig)
 
     cov = sorted(coverage, key=lambda c: c["fires_on_phishing_pct"])
-    fig, ax = plt.subplots(figsize=(8, 6))
+    fig, ax = plt.subplots(figsize=(9, 6.5))
     ys = np.arange(len(cov))
     ax.barh(ys + 0.2, [c["fires_on_phishing_pct"] for c in cov], height=0.4, color="#c62828", label="phishing pages")
     ax.barh(ys - 0.2, [c["fires_on_benign_pct"] for c in cov], height=0.4, color="#1e7a3c", label="benign pages")
-    ax.set_yticks(ys, [f"{c['id']} {c['name'][:34]}" for c in cov])
+    ax.set_yticks(ys, [f"{c['id']} {c['name'][:44]}" for c in cov])
     ax.set(xlabel="% of pages where the rule fires", title="Rule coverage")
     ax.legend(frameon=False, loc="lower right")
     fig.tight_layout()

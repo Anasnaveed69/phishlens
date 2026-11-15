@@ -18,7 +18,7 @@ from urllib.parse import urljoin, urlsplit
 
 from bs4 import BeautifulSoup
 
-FEATURE_VERSION = "features-2.1"
+FEATURE_VERSION = "features-2.2"
 
 BRANDS = [
     "paypal", "microsoft", "office365", "outlook", "apple", "icloud", "google", "gmail", "amazon",
@@ -77,7 +77,13 @@ NUMERIC_FEATURES = [
     "free_hosting", "url_shortener", "brand_in_host", "brand_typo_host", "host_entropy", "digits_in_host",
     "query_length", "num_inputs", "hidden_inputs", "email_inputs", "login_terms", "html_length_log",
     "title_length", "external_resource_ratio", "tracker_iframes", "brand_asset_hotlink", "wallet_seed_request",
+    # added in features-2.2
+    "claimed_brand_owned",
 ]
+# Pure page-size features. In PhreshPhish, benign pages are large full websites and phishing pages are
+# small, so a model can learn "small = phishing" (a dataset shortcut). The served model can be trained
+# without them (scripts/evaluate.py --drop-size-features); see docs/report T4.
+SIZE_FEATURES = ["html_length_log", "text_length_log", "num_links", "num_scripts", "title_length"]
 _LOOKALIKE = str.maketrans({"0": "o", "1": "l", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s"})
 
 
@@ -297,6 +303,10 @@ def extract(html: str, url: str | None = None) -> FeatureResult:
     # A brand is the *headline* of the page (title, heading or logo) but the domain belongs to someone else.
     # (features-1.x used any mention in body text, which flagged news and "pay with PayPal" pages.)
     values["brand_domain_mismatch"] = int(bool(mismatch) and len(mismatch) == len(prominent_brands))
+    owned = [b for b in prominent_brands if page_domain and _domain_owns_brand(page_domain, b)]
+    values["claimed_brand_owned"] = int(bool(owned))
+    if owned:
+        evidence["claimed_brand_owned"] = [f"'{owned[0]}' page on its own domain '{page_domain}'"]
 
     # Brand *images/icons* pulled from the real brand's servers while the page claims to be that brand.
     # (features-2.0 counted any resource incl. SDK scripts, which fired on 59% of benign pages.)

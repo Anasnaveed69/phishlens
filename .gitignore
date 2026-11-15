@@ -12,8 +12,6 @@ data/
 *.db-*
 
 # Generated artifacts (rebuild with scripts/)
-models/*.joblib
-models/*.meta.json
 fixtures/synthetic/
 
 # Editors / OS

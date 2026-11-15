@@ -1,0 +1,32 @@
+digraph DFD {
+  graph [rankdir=LR, fontname="Helvetica", fontsize=11, nodesep=0.5, ranksep=0.7, pad=0.3, bgcolor="white"];
+  node  [fontname="Helvetica", fontsize=10, shape=box, style="rounded,filled", fillcolor="#ffffff", color="#5b6475"];
+  edge  [fontname="Helvetica", fontsize=8.5, color="#5b6475"];
+
+  subgraph cluster_tb1 { label="TB1: untrusted client"; style="dashed"; color="#c62828"; fontcolor="#c62828";
+    admin   [label="Administrator", shape=box, fillcolor="#eef2ff"];
+    analyst [label="Analyst", fillcolor="#eef2ff"];
+    viewer  [label="Viewer", fillcolor="#eef2ff"];
+  }
+  subgraph cluster_tb2 { label="TB2: PhishLens server process"; style="dashed"; color="#2f5bea"; fontcolor="#2f5bea";
+    api [label="API layer\nauth · sessions · CSRF · RBAC\nrate limiting · validation · safe errors", fillcolor="#f5f7ff"];
+    subgraph cluster_tb3 { label="TB3: hostile-content zone"; style="dashed"; color="#b26a00"; fontcolor="#b26a00";
+      eng [label="Security engine\nparse only (no JS, no fetch)\nfeatures → rules → ML → decision", fillcolor="#fff7e8"];
+    }
+  }
+  subgraph cluster_tb4 { label="TB4: local storage (app owner only)"; style="dashed"; color="#1e7a3c"; fontcolor="#1e7a3c";
+    db  [label="SQLite\nusers · sessions(hash) · samples\nanalyses · config versions\naudit (append-only, hash chain)", shape=cylinder, fillcolor="#eef8f1"];
+    fs  [label="Stored pages\n(server-named by SHA-256)", shape=folder, fillcolor="#eef8f1"];
+    mdl [label="Model + SHA-256 metadata", shape=folder, fillcolor="#eef8f1"];
+  }
+
+  admin   -> api [label="config, users, audit\n(cookie + X-CSRF-Token)"];
+  analyst -> api [label="upload .html / .zip,\nfeedback, export"];
+  viewer  -> api [label="read results"];
+  api -> eng [label="validated bytes\n+ declared URL"];
+  eng -> api [label="decision, score,\nreasons, evidence"];
+  api -> db  [label="parameterized SQL"];
+  api -> fs  [label="write / read"];
+  mdl -> eng [label="integrity-checked load"];
+  api -> analyst [label="sanitized report\n(JSON / CSV)", style=dotted];
+}

@@ -165,7 +165,8 @@ def load(model_path: Path) -> LoadedModel | None:
     meta = json.loads(mp.read_text(encoding="utf-8"))
     if _sha256(model_path) != meta.get("sha256"):
         raise ModelIntegrityError("Model file hash does not match its metadata; refusing to load.")
-    if meta.get("feature_order") != NUMERIC_FEATURES:
+    order = meta.get("feature_order") or []
+    if not order or not set(order) <= set(NUMERIC_FEATURES):
         raise ModelIntegrityError("Model was trained with a different feature set; retrain it.")
     pipe = joblib.load(model_path)
     clf = pipe.named_steps.get("clf")

@@ -37,9 +37,17 @@ def main() -> None:
     header = list(rows[0].keys())[4:]
     if header != NUMERIC_FEATURES:
         sys.exit("features.csv was produced by a different feature version; re-run scripts/evaluate.py")
-    train = [r for r in rows if r["split"] == "train"]
-    test = [r for r in rows if r["split"] == "test"]
-    X = np.array([[float(r[n]) for n in NUMERIC_FEATURES] for r in train])
+    USED = ev.get("feature_order", NUMERIC_FEATURES)
+    # Reproduce evaluate.py's split *including its row order* (random forests depend on it).
+    from sklearn.model_selection import train_test_split
+    yall = np.array([int(r["y"]) for r in rows])
+    tr, te = train_test_split(np.arange(len(rows)), test_size=ev["dataset"]["test_size"],
+                              random_state=ev["dataset"]["seed"], stratify=yall)
+    if {int(i) for i in te} != {i for i, r in enumerate(rows) if r["split"] == "test"}:
+        sys.exit("could not reproduce the train/test split recorded in features.csv")
+    train = [rows[i] for i in tr]
+    test = [rows[i] for i in te]
+    X = np.array([[float(r[n]) for n in USED] for r in train])
     y = np.array([int(r["y"]) for r in train])
     algo = ev["served_algorithm"]
     seed = ev["dataset"]["seed"]
@@ -47,7 +55,7 @@ def main() -> None:
 
     # Verify against the predictions recorded by evaluate.py
     recorded = {r["file"]: float(r["p_served"]) for r in csv.DictReader((rep / "test_predictions.csv").open(encoding="utf-8"))}
-    Xt = np.array([[float(r[n]) for n in NUMERIC_FEATURES] for r in test])
+    Xt = np.array([[float(r[n]) for n in USED] for r in test])
     mine = pipe.predict_proba(Xt)[:, 1]
     diff = max(abs(mine[k] - recorded[r["file"]]) for k, r in enumerate(test))
     print(f"retrained {algo} on {len(train)} pages; max |Δp| vs recorded test predictions = {diff:.2e}")
@@ -60,7 +68,7 @@ def main() -> None:
     meta = {
         "version": ev.get("saved_model") or f"{algo}-{datetime.now(timezone.utc):%Y%m%d%H%M%S}",
         "algorithm": model_mod.ALGORITHM_LABELS[algo], "algorithm_id": algo,
-        "feature_version": FEATURE_VERSION, "feature_order": NUMERIC_FEATURES,
+        "feature_version": FEATURE_VERSION, "feature_order": USED,
         "trained_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "n_train": len(train), "n_test": len(test), "seed": seed,
         "dataset": f"{ev['dataset']['name']} ({ev['dataset']['pages']} pages)",
