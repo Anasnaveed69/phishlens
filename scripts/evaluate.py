@@ -63,8 +63,13 @@ def load(folder: Path, limit: int | None):
             skipped += 1
             continue
         t0 = time.perf_counter()
-        fr = extract(html, row.get("source_url") or None)
-        rr = eval_rules(fr)
+        try:
+            fr = extract(html, row.get("source_url") or None)
+            rr = eval_rules(fr)
+        except Exception as exc:  # a crash here is a robustness bug worth reporting
+            print(f"  extraction failed for {path.name}: {type(exc).__name__}: {exc}")
+            skipped += 1
+            continue
         times.append((time.perf_counter() - t0) * 1000)
         items.append({"file": path.name, "url": row.get("source_url") or "", "y": int(row["label"] == "phishing"),
                       "fr": fr, "rules": rr, "size": len(html)})
@@ -220,6 +225,12 @@ def main() -> None:
         report["saved_model"] = meta["version"]
         print(f"saved model {meta['version']} -> {mp}")
 
+    with (out / "test_predictions.csv").open("w", newline="", encoding="utf-8") as f:
+        wri = csv.writer(f)
+        wri.writerow(["file", "y", "p_lr", "p_rf", "rule_score", "hybrid"])
+        for k, i in enumerate(te):
+            wri.writerow([items[i]["file"], int(yt[k]), round(float(p_lr[k]), 5), round(float(p_rf[k]), 5),
+                          round(float(rule_scores[k]), 5), round(float(hybrid[k]), 5)])
     (out / "evaluation.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     charts(out, yt, p_lr, p_rf, rule_scores, hybrid, pred_h, coverage, top_lr)
     (out / "evaluation.md").write_text(markdown(report), encoding="utf-8")
