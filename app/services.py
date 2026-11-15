@@ -26,11 +26,14 @@ def load_model() -> str:
     global _model, _model_status
     with _model_lock:
         try:
-            _model = model_mod.load(settings.model_path)
+            _model = model_mod.load(settings.model_path, settings.model_sha256)
             _model_status = "loaded" if _model else "missing"
         except model_mod.ModelIntegrityError as exc:
             log.error("Model integrity check failed: %s", exc)
             _model, _model_status = None, "integrity_failed"
+        except Exception:  # corrupt metadata/pickle, version mismatch, ... -> keep serving in rules-only mode
+            log.exception("Model could not be loaded")
+            _model, _model_status = None, "load_failed"
     return _model_status
 
 
@@ -52,7 +55,20 @@ def store_sample(conn: sqlite3.Connection, *, filename: str, html: str, size: in
     digest = hashlib.sha256(html.encode("utf-8", errors="replace")).hexdigest()
     existing = conn.execute("SELECT * FROM samples WHERE sha256 = ?", (digest,)).fetchone()
     if existing:
-        return dict(existing), True
+        row = dict(existing)
+        changes = {}
+        # Same bytes, newly declared URL/label: the submitter's latest declaration wins (and is audited),
+        # instead of silently analysing with the old URL (independent review finding S4).
+        if source_url and source_url != row["source_url"]:
+            changes["source_url"] = {"from": row["source_url"], "to": source_url}
+        if label and label != row["label"]:
+            changes["label"] = {"from": row["label"], "to": label}
+        if changes:
+            conn.execute("UPDATE samples SET source_url = COALESCE(?, source_url), label = COALESCE(?, label) WHERE id = ?",
+                         (source_url, label, row["id"]))
+            audit.record(conn, action="sample.update", actor=None, target=row["id"], details=changes)
+            row = dict(conn.execute("SELECT * FROM samples WHERE id = ?", (row["id"],)).fetchone())
+        return row, True
     sample_id = new_id()
     settings.sample_dir.mkdir(parents=True, exist_ok=True)
     sample_path(digest).write_text(html, encoding="utf-8")
@@ -60,7 +76,7 @@ def store_sample(conn: sqlite3.Connection, *, filename: str, html: str, size: in
         """INSERT INTO samples (id, filename, sha256, source_url, label, size_bytes, uploaded_by, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
         (sample_id, filename, digest, source_url, label, size, user_id, now_iso()),
-    )
+    )  # writers are serialised (BEGIN IMMEDIATE in db.get_conn), so the sha256 check above cannot race
     row = conn.execute("SELECT * FROM samples WHERE id = ?", (sample_id,)).fetchone()
     return dict(row), False
 

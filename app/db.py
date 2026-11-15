@@ -126,7 +126,7 @@ def new_id() -> str:
 
 def connect() -> sqlite3.Connection:
     settings.db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(settings.db_path, timeout=10)
+    conn = sqlite3.connect(settings.db_path, timeout=30, isolation_level=None)  # explicit transactions
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")
@@ -135,8 +135,12 @@ def connect() -> sqlite3.Connection:
 
 @contextmanager
 def get_conn() -> Iterator[sqlite3.Connection]:
+    """One request = one IMMEDIATE transaction. Taking the write lock up front serialises writers,
+    so the audit chain's "read last hash -> insert" can never interleave between requests
+    (found by the independent review: 80 concurrent requests produced a false tamper alarm)."""
     conn = connect()
     try:
+        conn.execute("BEGIN IMMEDIATE")
         yield conn
         conn.commit()
     except Exception:
@@ -148,8 +152,12 @@ def get_conn() -> Iterator[sqlite3.Connection]:
 
 def init_db() -> None:
     settings.sample_dir.mkdir(parents=True, exist_ok=True)
-    with get_conn() as conn:
+    conn = connect()
+    try:
         conn.executescript(SCHEMA)
+    finally:
+        conn.close()
+    with get_conn() as conn:
         row = conn.execute("SELECT COUNT(*) AS n FROM config_versions").fetchone()
         if row["n"] == 0:
             cfg, reason = _initial_config()

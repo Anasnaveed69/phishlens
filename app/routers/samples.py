@@ -25,8 +25,8 @@ def _reject(exc: InputError, principal: Principal, request: Request, action: str
     return err(_CODE_MAP.get(exc.code, INVALID_INPUT), exc.message)
 
 
-async def _read_limited(upload: UploadFile, limit: int) -> bytes:
-    data = await upload.read(limit + 1)  # read at most limit+1 bytes, never the whole stream
+def _read_limited(upload: UploadFile, limit: int) -> bytes:
+    data = upload.file.read(limit + 1)  # read at most limit+1 bytes, never the whole stream
     if len(data) > limit:
         raise InputError("FILE_TOO_LARGE", f"The file exceeds {limit // 1024} KB.")
     return data
@@ -40,7 +40,7 @@ def _check_rate(principal: Principal, request: Request):
 
 
 @router.post("")
-async def submit_page(
+def submit_page(
     request: Request,
     file: UploadFile = File(...),
     source_url: str | None = Form(None),
@@ -50,7 +50,7 @@ async def submit_page(
     """Upload one saved page, validate it, and analyze it immediately."""
     _check_rate(principal, request)
     try:
-        content = await _read_limited(file, settings.max_upload_bytes)
+        content = _read_limited(file, settings.max_upload_bytes)
         page = validate_page(file.filename or "", content, settings.max_upload_bytes)
         url = validate_url(source_url)
         lab = validate_label(label)
@@ -68,7 +68,7 @@ async def submit_page(
 
 
 @router.post("/import")
-async def import_dataset(
+def import_dataset(
     request: Request,
     file: UploadFile = File(...),
     analyze: bool = Form(False),
@@ -78,11 +78,18 @@ async def import_dataset(
     try:
         if not (file.filename or "").lower().endswith(".zip"):
             raise InputError("UNSUPPORTED_TYPE", "Dataset imports must be a .zip file.")
-        content = await _read_limited(file, settings.max_import_bytes)
+        content = _read_limited(file, settings.max_import_bytes)
         items = read_dataset_zip(content, settings.max_import_bytes, settings.max_import_files, settings.max_upload_bytes)
     except InputError as exc:
         raise _reject(exc, principal, request, "dataset.import")
 
+    # Imports count against the same per-user analysis budget: 1 request, plus 1 per page analysed.
+    if not analyze_limiter.allow(principal.user_id, 1 + (len(items) if analyze else 0)):
+        audit.record_separately(action="dataset.import", outcome="denied", actor=principal.username,
+                                role=principal.role, ip=client_ip(request),
+                                details={"reason": "rate_limited", "pages": len(items), "analyze": analyze})
+        raise err(RATE_LIMITED, "Too many analyses for one minute. Import without 'analyze', "
+                                "or split the dataset into smaller archives.")
     ip = client_ip(request)
     created = duplicates = analyzed = 0
     with get_conn() as conn:

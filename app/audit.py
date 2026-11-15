@@ -1,13 +1,18 @@
-"""Append-only, hash-chained audit log.
+"""Append-only, HMAC-chained audit log.
 
-Each event stores hash = sha256(prev_hash || canonical_json(event)). If anyone edits
-or removes a row directly in the DB file, verify_chain() reports where the chain breaks.
-The DB triggers in db.py additionally block UPDATE/DELETE through SQLite.
+Each event stores hash = HMAC-SHA256(key, prev_hash || canonical_json(event)). The key lives in
+secrets/audit.key, outside the data folder, so someone holding only the database cannot edit rows
+and recompute the chain. verify_chain() reports where the chain breaks; DB triggers additionally
+block UPDATE/DELETE through SQLite. Limitation: deleting the newest rows (tail truncation) is only
+detectable against an external copy of the last hash, which /api/admin/audit/verify returns.
 """
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
+import os
+import secrets as _secrets
 import re
 import sqlite3
 from typing import Any
@@ -38,8 +43,27 @@ def _canonical(event: dict) -> str:
     return json.dumps(event, sort_keys=True, separators=(",", ":"))
 
 
+_KEY: bytes | None = None
+
+
+def _key() -> bytes:
+    global _KEY
+    if _KEY is None:
+        from .config import settings
+        path = settings.secret_dir / "audit.key"
+        if not path.exists():
+            settings.secret_dir.mkdir(parents=True, exist_ok=True)
+            path.write_text(_secrets.token_hex(32), encoding="utf-8")
+            try:
+                os.chmod(path, 0o600)
+            except OSError:
+                pass
+        _KEY = bytes.fromhex(path.read_text(encoding="utf-8").strip())
+    return _KEY
+
+
 def _event_hash(prev_hash: str, event: dict) -> str:
-    return hashlib.sha256((prev_hash + _canonical(event)).encode("utf-8")).hexdigest()
+    return hmac.new(_key(), (prev_hash + _canonical(event)).encode("utf-8"), hashlib.sha256).hexdigest()
 
 
 def record(
@@ -89,7 +113,8 @@ def verify_chain(conn: sqlite3.Connection) -> dict:
     for row in conn.execute("SELECT * FROM audit_events ORDER BY seq ASC"):
         event = {k: row[k] for k in ("id", "ts", "actor", "role", "action", "target", "outcome", "ip", "details")}
         if row["prev_hash"] != prev or _event_hash(prev, event) != row["hash"]:
-            return {"valid": False, "events_checked": count, "broken_at_seq": row["seq"]}
+            return {"valid": False, "events_checked": count, "broken_at_seq": row["seq"], "head": None}
         prev = row["hash"]
         count += 1
-    return {"valid": True, "events_checked": count, "broken_at_seq": None}
+    # "head" is the newest hash: keep a copy elsewhere to also detect deletion of the newest rows.
+    return {"valid": True, "events_checked": count, "broken_at_seq": None, "head": prev}

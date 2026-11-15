@@ -47,6 +47,13 @@ class Settings:
     login_rate_limit: int = field(default_factory=lambda: _int("PHISHLENS_LOGIN_RATE", 5))       # attempts / minute
     analyze_rate_limit: int = field(default_factory=lambda: _int("PHISHLENS_ANALYZE_RATE", 30))  # requests / minute
 
+    # Secret key for the audit chain HMAC. Kept OUTSIDE data/ so a copy of the database alone cannot
+    # be re-chained. Generated on first run if missing.
+    secret_dir: Path = field(default_factory=lambda: Path(os.environ.get("PHISHLENS_SECRET_DIR", BASE_DIR / "secrets")))
+    # Optional: pin the expected SHA-256 of models/model.joblib (e.g. in .env) so a swapped model is refused
+    # even if its .meta.json was edited too.
+    model_sha256: str = field(default_factory=lambda: os.environ.get("PHISHLENS_MODEL_SHA256", "").strip().lower())
+
     # Set to "1" only when served over HTTPS. Locally we run on http://127.0.0.1.
     cookie_secure: bool = field(default_factory=lambda: os.environ.get("PHISHLENS_COOKIE_SECURE", "0") == "1")
 

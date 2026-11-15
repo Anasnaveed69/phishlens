@@ -48,6 +48,9 @@ def main() -> None:
 
     if not args.username:
         ap.error("username is required (or use --demo)")
+    import re
+    if not re.fullmatch(r"[a-z0-9_.-]{3,32}", args.username.lower()):
+        sys.exit("username must be 3-32 characters: a-z, 0-9, _ . -")
     pw = getpass.getpass("Password: ")
     problems = password_problems(pw)
     if problems:

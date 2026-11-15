@@ -70,8 +70,13 @@ def validate_url(url: str | None) -> str | None:
         return None
     if len(url) > MAX_URL_LENGTH or any(ord(c) < 32 for c in url):
         raise InputError("INVALID_INPUT", "The URL is too long or contains control characters.")
-    parts = urlsplit(url)
-    if parts.scheme.lower() not in {"http", "https"} or not parts.hostname:
+    try:
+        parts = urlsplit(url)
+        host = parts.hostname
+        _ = parts.port  # raises ValueError for a malformed port
+    except ValueError:
+        raise InputError("INVALID_INPUT", "The URL is malformed.")
+    if parts.scheme.lower() not in {"http", "https"} or not host:
         raise InputError("INVALID_INPUT", "The URL must start with http:// or https:// and include a host.")
     return url
 

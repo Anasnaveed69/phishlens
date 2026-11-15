@@ -17,15 +17,19 @@ class RateLimiter:
         self._hits: dict[str, deque[float]] = defaultdict(deque)
         self._lock = threading.Lock()
 
-    def allow(self, key: str) -> bool:
+    def allow(self, key: str, n: int = 1) -> bool:
+        """Record n hits for key if they fit in the window; otherwise record nothing and refuse."""
         now = time.monotonic()
         with self._lock:
+            if len(self._hits) > 10_000:  # prune idle keys so unauthenticated traffic can't grow memory
+                for k in [k for k, q in self._hits.items() if not q or now - q[-1] > self.window]:
+                    del self._hits[k]
             q = self._hits[key]
             while q and now - q[0] > self.window:
                 q.popleft()
-            if len(q) >= self.limit:
+            if len(q) + n > self.limit:
                 return False
-            q.append(now)
+            q.extend([now] * n)
             return True
 
     def reset(self) -> None:

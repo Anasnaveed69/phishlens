@@ -15,6 +15,7 @@ from ..security.sessions import COOKIE_NAME, _hash, create_session, delete_sessi
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 login_limiter = RateLimiter(settings.login_rate_limit, 60)
+spray_limiter = RateLimiter(settings.login_rate_limit * 4, 60)  # per IP across all usernames (password spraying)
 
 
 class LoginIn(BaseModel):
@@ -26,7 +27,7 @@ class LoginIn(BaseModel):
 def login(body: LoginIn, request: Request, response: Response):
     ip = client_ip(request)
     username = body.username.strip().lower()
-    if not login_limiter.allow(f"{ip}:{username}"):
+    if not spray_limiter.allow(f"{ip}") or not login_limiter.allow(f"{ip}:{username}"):
         audit.record_separately(action="auth.login", outcome="denied", actor=username, ip=ip,
                                 details={"reason": "rate_limited"})
         raise err(RATE_LIMITED)

@@ -157,13 +157,17 @@ def train(X: list[list[float]], y: list[int], model_path: Path, dataset_note: st
     return meta
 
 
-def load(model_path: Path) -> LoadedModel | None:
-    """Return the model, or None if no model has been trained yet (rules-only mode)."""
+def load(model_path: Path, pinned_sha256: str = "") -> LoadedModel | None:
+    """Return the model, or None if no model has been trained yet (rules-only mode).
+    pinned_sha256 (optional, from the environment) must match the file, independent of .meta.json."""
     mp = meta_path(model_path)
     if not model_path.exists() or not mp.exists():
         return None
     meta = json.loads(mp.read_text(encoding="utf-8"))
-    if _sha256(model_path) != meta.get("sha256"):
+    actual = _sha256(model_path)
+    if pinned_sha256 and actual != pinned_sha256:
+        raise ModelIntegrityError("Model file does not match the pinned PHISHLENS_MODEL_SHA256; refusing to load.")
+    if actual != meta.get("sha256"):
         raise ModelIntegrityError("Model file hash does not match its metadata; refusing to load.")
     order = meta.get("feature_order") or []
     if not order or not set(order) <= set(NUMERIC_FEATURES):

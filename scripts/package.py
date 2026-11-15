@@ -12,12 +12,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 NAME = "PhishLens_Class1_Group01"
-BLOCKED = (".env", "data/", ".venv/", "phreshphish_sample")
+BLOCKED = ("data/", ".venv/", "phreshphish_sample", "secrets/", "TASKS.md")
 
 
 def main() -> None:
     files = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.split()
-    files = [f for f in files if not f.startswith(BLOCKED)]
+    files = [f for f in files if not f.startswith(BLOCKED) and not (f.startswith(".env") and f != ".env.example")]
     extra = [p.relative_to(ROOT).as_posix() for p in (ROOT / "models").glob("model*") if p.is_file()]
     out = ROOT / "dist" / f"{NAME}.zip"
     out.parent.mkdir(exist_ok=True)

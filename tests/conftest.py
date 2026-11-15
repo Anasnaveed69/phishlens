@@ -40,8 +40,9 @@ def client():
 
 @pytest.fixture(autouse=True)
 def _reset_limits():
-    from app.routers.auth import login_limiter
+    from app.routers.auth import login_limiter, spray_limiter
     login_limiter.reset()
+    spray_limiter.reset()
     yield
 
 

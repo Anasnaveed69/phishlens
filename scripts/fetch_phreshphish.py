@@ -30,6 +30,8 @@ def main() -> None:
     ap.add_argument("--lang", default="en", help="keep only this language ('' for all)")
     ap.add_argument("--out", default="phreshphish_sample")
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--exclude-dir", action="append", default=[],
+                    help="skip any page whose HTML already appears in this folder (build a fresh, unseen holdout)")
     args = ap.parse_args()
 
     from datasets import load_dataset  # imported here so --help works without the package
@@ -41,6 +43,11 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
     counts = {"benign": 0, "phishing": 0}
     seen: set[str] = set()
+    for d in args.exclude_dir:
+        for p in Path(d).glob("*.htm*"):
+            seen.add(hashlib.sha256(p.read_text(encoding="utf-8", errors="replace").encode("utf-8", "replace")).hexdigest())
+    if args.exclude_dir:
+        print(f"excluding {len(seen)} previously used pages")
     rows = []
     for rec in ds:
         label = "phishing" if rec["label"] == "phish" else "benign"
