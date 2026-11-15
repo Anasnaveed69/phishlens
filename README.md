@@ -7,12 +7,12 @@ features, combines a baseline rule engine with an ML classifier, and **explains 
 decision** (which rules fired, with evidence, and which features pushed the model).
 Pages are only parsed: they are never rendered, executed, or fetched.
 
-| Member | Roll no. | Role (see [TASKS.md](TASKS.md)) |
-|---|---|---|
-| Abdul Hadi | 23L-0923 | _assign_ |
-| Anas Naveed | 23L-0764 | _assign_ |
-| Mohib Ali | 23L-0763 | _assign_ |
-| Abbas Haider | 23L-0525 | _assign_ |
+| Member | Roll no. |
+|---|---|
+| Abdul Hadi | 23L-0923 |
+| Anas Naveed | 23L-0764 |
+| Mohib Ali | 23L-0763 |
+| Abbas Haider | 23L-0525 |
 
 ## Quick start (VS Code, any laptop)
 
