@@ -167,4 +167,8 @@ def load(model_path: Path) -> LoadedModel | None:
         raise ModelIntegrityError("Model file hash does not match its metadata; refusing to load.")
     if meta.get("feature_order") != NUMERIC_FEATURES:
         raise ModelIntegrityError("Model was trained with a different feature set; retrain it.")
-    return LoadedModel(pipeline=joblib.load(model_path), meta=meta)
+    pipe = joblib.load(model_path)
+    clf = pipe.named_steps.get("clf")
+    if hasattr(clf, "n_jobs"):
+        clf.n_jobs = 1  # single-page predictions: thread start-up costs more than it saves
+    return LoadedModel(pipeline=pipe, meta=meta)

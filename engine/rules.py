@@ -12,7 +12,7 @@ from typing import Callable
 
 from .features import FeatureResult
 
-RULESET_VERSION = "rules-2.0"
+RULESET_VERSION = "rules-2.1"
 
 
 @dataclass(frozen=True)
@@ -48,10 +48,15 @@ RULES: list[Rule] = [
     Rule("R05", "Credential request with urgency language", 0.40, "medium",
          lambda f: _v("credential_terms")(f) > 0 and _v("urgency_terms")(f) > 0,
          "The page pressures the user ('urgent', 'suspended', ...) while asking for credentials.", "urgency_terms"),
-    Rule("R06", "Hidden iframe", 0.20, "low", lambda f: _v("hidden_iframes")(f) > 0,
-         "The page contains an invisible iframe that is not a known analytics/consent frame.", "hidden_iframes"),
-    Rule("R07", "Obfuscated JavaScript", 0.20, "low", lambda f: _v("obfuscation_hits")(f) >= 3,
-         "Inline script combines several obfuscation functions (eval/atob/unescape/...).", "obfuscation_hits"),
+    # rules-2.1: R06/R07 alone fired on 56% / 1.7% of benign pages in PhreshPhish (precision 0.16 / 0.11),
+    # so they now only count on pages that also ask for a password.
+    Rule("R06", "Hidden iframe on a login page", 0.25, "medium",
+         lambda f: _v("hidden_iframes")(f) > 0 and _v("num_password_inputs")(f) > 0,
+         "A page asking for a password also contains an invisible iframe (not a known analytics frame).",
+         "hidden_iframes"),
+    Rule("R07", "Obfuscated JavaScript on a login page", 0.25, "medium",
+         lambda f: _v("obfuscation_hits")(f) >= 2 and _v("num_password_inputs")(f) > 0,
+         "A page asking for a password runs obfuscated inline script (eval/atob/unescape/...).", "obfuscation_hits"),
     Rule("R08", "Suspicious top-level domain", 0.20, "low", lambda f: _v("suspicious_tld")(f) == 1,
          "The domain uses a TLD that is frequently abused for phishing.", "suspicious_tld"),
     Rule("R09", "Excessive subdomains", 0.20, "low", lambda f: _v("num_subdomains")(f) >= 3,
@@ -61,11 +66,10 @@ RULES: list[Rule] = [
     Rule("R11", "Login page without HTTPS", 0.25, "medium",
          lambda f: _v("num_password_inputs")(f) > 0 and _v("uses_https")(f) == 0 and _v("url_length")(f) > 0,
          "A password field is served over plain HTTP."),
-    Rule("R12", "Brand assets hot-linked from the real brand", 0.35, "medium",
+    Rule("R12", "Brand logo hot-linked from the real brand", 0.35, "medium",
          lambda f: _v("brand_asset_hotlink")(f) == 1,
-         "Images/scripts are loaded directly from a brand's own servers by a site that is not the brand "
-         "(cloned pages do this; rules-1.x counted any CDN and fired on 36% of benign pages).",
-         "brand_asset_hotlink"),
+         "The page claims a brand and shows that brand's logo/icon straight from the brand's own servers, "
+         "while not being hosted by the brand (typical of cloned pages).", "brand_asset_hotlink"),
     Rule("R13", "Brand in title but not in domain", 0.25, "low", lambda f: _v("title_brand_mismatch")(f) == 1,
          "The page title claims a brand that does not match the host.", "title_brand_mismatch"),
     Rule("R14", "Meta-refresh redirect", 0.15, "low", lambda f: _v("has_meta_refresh")(f) == 1,
@@ -78,7 +82,8 @@ RULES: list[Rule] = [
 RULES += [
     Rule("R16", "Form submits to an IP address", 0.45, "high", lambda f: _v("form_action_ip")(f) > 0,
          "A form sends its data straight to a raw IP address.", "form_action_ip"),
-    Rule("R17", "Embedded data: / blob: document", 0.30, "medium", lambda f: _v("data_uri_count")(f) > 0,
+    Rule("R17", "Embedded data: / blob: document", 0.30, "medium",
+         lambda f: _v("data_uri_count")(f) > 0 and (_v("num_password_inputs")(f) > 0 or _v("num_forms")(f) > 0),
          "The page embeds a whole document via a data:/blob: URI, a common way to hide phishing content.",
          "data_uri_count"),
     Rule("R18", "Look-alike brand domain", 0.50, "high", lambda f: _v("lookalike_brand_host")(f) == 1,

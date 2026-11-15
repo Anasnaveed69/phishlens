@@ -18,7 +18,7 @@ from urllib.parse import urljoin, urlsplit
 
 from bs4 import BeautifulSoup
 
-FEATURE_VERSION = "features-2.0"
+FEATURE_VERSION = "features-2.1"
 
 BRANDS = [
     "paypal", "microsoft", "office365", "outlook", "apple", "icloud", "google", "gmail", "amazon",
@@ -282,17 +282,6 @@ def extract(html: str, url: str | None = None) -> FeatureResult:
                  if (t.get("src") or t.get("href"))]
     ext_res = [r for r in resources if _is_external(r, page_domain, url)]
     values["external_resource_ratio"] = round(len(ext_res) / len(resources), 3) if resources else 0.0
-    hotlinks = []
-    for r in ext_res:
-        rdom = registrable_domain(_host_of(r, url)) or ""
-        for b in BRANDS:
-            if _domain_owns_brand(rdom, b) and not (page_domain and _domain_owns_brand(page_domain, b)):
-                hotlinks.append(f"{b}: {_snippet(r, 80)}")
-                break
-    values["brand_asset_hotlink"] = int(bool(hotlinks))
-    if hotlinks:
-        evidence["brand_asset_hotlink"] = hotlinks[:3]
-
     # --- text --------------------------------------------------------------
     for tag in soup(["script", "style", "noscript"]):
         tag.decompose()
@@ -308,6 +297,23 @@ def extract(html: str, url: str | None = None) -> FeatureResult:
     # A brand is the *headline* of the page (title, heading or logo) but the domain belongs to someone else.
     # (features-1.x used any mention in body text, which flagged news and "pay with PayPal" pages.)
     values["brand_domain_mismatch"] = int(bool(mismatch) and len(mismatch) == len(prominent_brands))
+
+    # Brand *images/icons* pulled from the real brand's servers while the page claims to be that brand.
+    # (features-2.0 counted any resource incl. SDK scripts, which fired on 59% of benign pages.)
+    image_srcs = [t.get("src") for t in soup.find_all("img") if t.get("src")]
+    image_srcs += [t.get("href") for t in soup.find_all("link", rel=True)
+                   if "icon" in " ".join(t.get("rel")).lower() and t.get("href")]
+    hotlinks = []
+    for r in image_srcs:
+        if not _is_external(r, page_domain, url):
+            continue
+        rdom = registrable_domain(_host_of(r, url)) or ""
+        claimed = [b for b in prominent_brands if _domain_owns_brand(rdom, b)]
+        if claimed and not (page_domain and _domain_owns_brand(page_domain, claimed[0])):
+            hotlinks.append(f"{claimed[0]}: {_snippet(r, 80)}")
+    values["brand_asset_hotlink"] = int(bool(hotlinks))
+    if hotlinks:
+        evidence["brand_asset_hotlink"] = hotlinks[:3]
     if values["brand_domain_mismatch"]:
         evidence["brand_domain_mismatch"] = [f"brand '{b}' on domain '{page_domain}'" for b in mismatch[:3]]
     urg = [t for t in URGENCY_TERMS if t in lower]

@@ -78,6 +78,11 @@ def load(folder: Path, limit: int | None):
     return items, times, skipped
 
 
+def defang(url: str) -> str:
+    """Make real phishing URLs non-clickable in reports (hxxp://example[.]com)."""
+    return url.replace("http", "hxxp", 1).replace(".", "[.]")
+
+
 def metrics(y, pred, score=None) -> dict:
     m = model_mod.metrics(y, pred)
     if score is not None and len(set(y)) == 2:
@@ -172,6 +177,8 @@ def main() -> None:
     lr = served  # the model used for explanations / error analysis below is the served one
 
     # ---- full-pipeline latency on test pages ------------------------------
+    if hasattr(served.named_steps["clf"], "n_jobs"):
+        served.named_steps["clf"].n_jobs = 1  # measure latency the way the app serves it
     loaded = model_mod.LoadedModel(pipeline=served, meta={"version": "eval", "feature_order": NUMERIC_FEATURES})
     from engine.pipeline import analyze
     lat = []
@@ -204,7 +211,7 @@ def main() -> None:
             ml = contrib_model.predict(items[i]["fr"], top_k=3)
             errors.append({
                 "type": "false_positive" if pred_h[k] == 1 else "false_negative",
-                "file": items[i]["file"], "url": items[i]["url"][:120],
+                "file": items[i]["file"], "url": defang(items[i]["url"][:120]),
                 "hybrid_score": round(float(hybrid[k]), 3), "ml_prob": round(float(p_served[k]), 3),
                 "rule_score": round(float(rule_scores[k]), 3),
                 "rules_fired": " ".join(f["id"] for f in items[i]["rules"]["fired"]),
@@ -270,6 +277,15 @@ def main() -> None:
         report["saved_model"] = meta["version"]
         print(f"saved model {meta['version']} -> {mp}")
 
+    # Feature matrix (no URLs, no page content): lets anyone retrain the exact served model
+    # without the raw dataset -> scripts/train_from_features.py
+    test_set = set(int(i) for i in te)
+    with (out / "features.csv").open("w", newline="", encoding="utf-8") as f:
+        wri = csv.writer(f)
+        wri.writerow(["file", "split", "y", "rule_score"] + NUMERIC_FEATURES)
+        for i, it in enumerate(items):
+            wri.writerow([it["file"], "test" if i in test_set else "train", it["y"], round(it["rules"]["score"], 5)]
+                         + [round(v, 6) for v in it["fr"].vector()])
     with (out / "test_predictions.csv").open("w", newline="", encoding="utf-8") as f:
         wri = csv.writer(f)
         wri.writerow(["file", "y", "p_lr", "p_rf", "p_served", "rule_score", "hybrid"])
