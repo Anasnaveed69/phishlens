@@ -212,7 +212,6 @@ def test_dashboard_for_all_roles(client):
 
 
 def test_password_change_flow(client):
-    import time
     from .conftest import PASSWORDS
     h = login(client, "viewer")
     bad = client.post("/api/auth/password", headers=h, json={"current_password": "wrong-one-123", "new_password": "Brand-new-pass-9"})

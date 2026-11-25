@@ -1,0 +1,18 @@
+# Lint config (run: ruff check .). Rules: pyflakes, pycodestyle, bugbear, bandit security, pyupgrade.
+line-length = 120
+target-version = "py311"
+
+[lint]
+select = ["E", "F", "W", "B", "S", "UP", "SIM", "C4", "PIE", "RET"]
+ignore = [
+  "E501",   # long lines are wrapped by hand where it helps readability
+  "S101",   # asserts are fine in tests
+  "S311",   # `random` is only used for synthetic data and load tests, never for secrets
+  "B008",   # FastAPI's Depends()/File()/Form() defaults are the framework's idiom
+  "SIM108", "RET504", "RET505",
+]
+
+[lint.per-file-ignores]
+"tests/**" = ["S105", "S106", "S108", "E741", "B017", "SIM117", "S603"]
+"scripts/**" = ["S603", "S607"]   # scripts call git/ffmpeg/node deliberately
+"docs/report/**" = ["S603", "S607"]

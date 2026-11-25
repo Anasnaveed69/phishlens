@@ -26,8 +26,7 @@ TOPICS = ["cooking", "travel tips", "football scores", "laptop reviews", "study 
 URGENCY = ["Your account has been suspended", "Unusual activity detected", "Action required within 24 hours",
            "Verify your account immediately", "Your account will be closed", "Unauthorized login attempt"]
 BAD_TLDS = ["tk", "xyz", "top", "ml", "click"]
-LOREM = ("lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut "
-         "labore et dolore magna aliqua ut enim ad minim veniam quis nostrud exercitation").split()
+LOREM = ["lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipiscing", "elit", "sed", "do", "eiusmod", "tempor", "incididunt", "ut", "labore", "et", "dolore", "magna", "aliqua", "ut", "enim", "ad", "minim", "veniam", "quis", "nostrud", "exercitation"]
 
 
 def para(rng: random.Random, n: int) -> str:
