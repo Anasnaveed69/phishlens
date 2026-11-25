@@ -9,10 +9,11 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 import uuid
 from contextlib import contextmanager
-from datetime import datetime, timezone
-from typing import Iterator
+from datetime import datetime, UTC
+from collections.abc import Iterator
 
 from .config import settings
 
@@ -44,7 +45,8 @@ CREATE TABLE IF NOT EXISTS samples (
     label       TEXT CHECK (label IN ('phishing', 'benign') OR label IS NULL),
     size_bytes  INTEGER NOT NULL,
     uploaded_by TEXT NOT NULL REFERENCES users(id),
-    created_at  TEXT NOT NULL
+    created_at  TEXT NOT NULL,
+    purged_at   TEXT                       -- raw HTML deleted by the retention policy (analyses are kept)
 );
 
 CREATE TABLE IF NOT EXISTS analyses (
@@ -117,7 +119,7 @@ DEFAULT_CONFIG = {
 
 
 def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def new_id() -> str:
@@ -133,20 +135,38 @@ def connect() -> sqlite3.Connection:
     return conn
 
 
+_WRITE_LOCK = threading.Lock()
+
+
 @contextmanager
 def get_conn() -> Iterator[sqlite3.Connection]:
     """One request = one IMMEDIATE transaction. Taking the write lock up front serialises writers,
     so the audit chain's "read last hash -> insert" can never interleave between requests
     (found by the independent review: 80 concurrent requests produced a false tamper alarm)."""
+    with _WRITE_LOCK:  # FIFO-ish queue inside the process; SQLite's busy-retry backs off and starves writers
+        conn = connect()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+
+@contextmanager
+def read_conn() -> Iterator[sqlite3.Connection]:
+    """Read-only work: a deferred transaction (consistent snapshot under WAL) that never takes the
+    write lock, so page views don't queue behind uploads. Anything that writes - including an
+    audit event - must use get_conn() instead. (Load test, Nov 2026: p95 1.2 s -> see docs/qa-report.md.)"""
     conn = connect()
     try:
-        conn.execute("BEGIN IMMEDIATE")
+        conn.execute("BEGIN")
         yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
     finally:
+        conn.rollback()
         conn.close()
 
 
@@ -158,6 +178,9 @@ def init_db() -> None:
     finally:
         conn.close()
     with get_conn() as conn:
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(samples)")}
+        if "purged_at" not in cols:  # migrate databases created before the retention feature
+            conn.execute("ALTER TABLE samples ADD COLUMN purged_at TEXT")
         row = conn.execute("SELECT COUNT(*) AS n FROM config_versions").fetchone()
         if row["n"] == 0:
             cfg, reason = _initial_config()

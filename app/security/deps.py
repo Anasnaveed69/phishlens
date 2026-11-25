@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from fastapi import Request
 
 from .. import audit
-from ..db import get_conn
+from ..db import read_conn
 from ..errors import AUTH_REQUIRED, CSRF_FAILED, FORBIDDEN, err
 from .sessions import COOKIE_NAME, csrf_matches, load_session
 
@@ -45,8 +45,8 @@ def client_ip(request: Request) -> str | None:
 
 def get_principal(request: Request) -> Principal:
     token = request.cookies.get(COOKIE_NAME)
-    with get_conn() as conn:
-        row = load_session(conn, token)
+    with read_conn() as conn:
+        row = load_session(conn, token, purge=False)
     if row is None:
         raise err(AUTH_REQUIRED)
     principal = Principal(row["user_id"], row["username"], row["role"], row["csrf_token"])

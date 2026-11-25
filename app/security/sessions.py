@@ -9,7 +9,7 @@ from __future__ import annotations
 import hashlib
 import secrets
 import sqlite3
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 
 from ..config import settings
 from ..db import now_iso
@@ -24,7 +24,7 @@ def _hash(token: str) -> str:
 def create_session(conn: sqlite3.Connection, user_id: str) -> tuple[str, str]:
     token = secrets.token_urlsafe(32)
     csrf = secrets.token_urlsafe(32)
-    expires = datetime.now(timezone.utc) + timedelta(minutes=settings.session_ttl_minutes)
+    expires = datetime.now(UTC) + timedelta(minutes=settings.session_ttl_minutes)
     conn.execute(
         "INSERT INTO sessions (token_hash, user_id, csrf_token, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
         (_hash(token), user_id, csrf, now_iso(), expires.isoformat(timespec="seconds")),
@@ -32,7 +32,9 @@ def create_session(conn: sqlite3.Connection, user_id: str) -> tuple[str, str]:
     return token, csrf
 
 
-def load_session(conn: sqlite3.Connection, token: str | None) -> sqlite3.Row | None:
+def load_session(conn: sqlite3.Connection, token: str | None, purge: bool = True) -> sqlite3.Row | None:
+    """Return the session row, or None. Expired rows are deleted only when purge=True (write
+    transactions); read-only callers just ignore them and purge_expired() cleans up at login."""
     if not token or len(token) > 128:
         return None
     row = conn.execute(
@@ -42,8 +44,9 @@ def load_session(conn: sqlite3.Connection, token: str | None) -> sqlite3.Row | N
     ).fetchone()
     if row is None:
         return None
-    if row["disabled"] or datetime.fromisoformat(row["expires_at"]) < datetime.now(timezone.utc):
-        conn.execute("DELETE FROM sessions WHERE token_hash = ?", (row["token_hash"],))
+    if row["disabled"] or datetime.fromisoformat(row["expires_at"]) < datetime.now(UTC):
+        if purge:
+            conn.execute("DELETE FROM sessions WHERE token_hash = ?", (row["token_hash"],))
         return None
     return row
 

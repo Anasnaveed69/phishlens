@@ -12,8 +12,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import services
-from .config import BASE_DIR
-from .db import get_conn, init_db
+from .config import BASE_DIR, settings
+from .db import init_db, read_conn
 from .errors import install_handlers
 from .routers import admin, analyses, auth, dashboard, samples
 
@@ -23,14 +23,23 @@ FRONTEND = BASE_DIR / "frontend"
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    init_db()                          # idempotent: safe after a crash/restart
+    init_db()                          # idempotent: safe after a crash/restart (also migrates old DBs)
+    if settings.retention_days > 0:
+        from . import audit
+        from .db import get_conn
+        with get_conn() as conn:
+            n = services.purge_raw_pages(conn, settings.retention_days)
+            if n:
+                audit.record(conn, action="sample.purge", actor="system", role="system",
+                             details={"older_than_days": settings.retention_days, "purged": n})
     status = services.load_model()     # falls back to rules-only if missing or tampered
     logging.getLogger("phishlens").info("startup complete, model status=%s", status)
     yield
 
 
-app = FastAPI(title="PhishLens", version="0.1.0", lifespan=lifespan,
-              docs_url="/api/docs", redoc_url=None, openapi_url="/api/openapi.json")
+app = FastAPI(title="PhishLens", version="1.1.0", lifespan=lifespan, redoc_url=None,
+              docs_url="/api/docs" if settings.api_docs else None,
+              openapi_url="/api/openapi.json" if settings.api_docs else None)
 install_handlers(app)
 
 
@@ -41,6 +50,10 @@ async def security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
+    if settings.cookie_secure:  # only meaningful (and only safe to send) behind HTTPS
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     if not request.url.path.startswith("/api/docs"):
         # No inline scripts and nothing loaded from other origins.
         response.headers["Content-Security-Policy"] = (
@@ -61,7 +74,7 @@ app.include_router(dashboard.router)
 
 @app.get("/api/health")
 def health():
-    with get_conn() as conn:
+    with read_conn() as conn:
         conn.execute("SELECT 1")
     return {"status": "ok", "model": services.model_info().get("status")}
 

@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from engine.features import NUMERIC_FEATURES
 
 from .. import audit
-from ..db import get_conn, new_id, now_iso
+from ..db import get_conn, new_id, now_iso, read_conn
 from ..errors import INVALID_INPUT, NOT_FOUND, err
 from ..security.deps import Principal, client_ip, require
 
@@ -60,7 +60,7 @@ def list_analyses(decision: str | None = None, q: str | None = None, sample_id: 
         like = "%" + q[:100].replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
         params += [like, like]
     sql = _SELECT + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY a.created_at DESC, a.rowid DESC LIMIT ? OFFSET ?"
-    with get_conn() as conn:
+    with read_conn() as conn:
         rows = conn.execute(sql, params + [limit, offset]).fetchall()
         counts = {r["decision"]: r["n"] for r in conn.execute("SELECT decision, COUNT(*) AS n FROM analyses GROUP BY decision")}
     items = []
@@ -74,7 +74,7 @@ def list_analyses(decision: str | None = None, q: str | None = None, sample_id: 
 
 @router.get("/{analysis_id}")
 def get_analysis(analysis_id: str, principal: Principal = Depends(require("result:read"))):
-    with get_conn() as conn:
+    with read_conn() as conn:
         row = conn.execute(_SELECT + " WHERE a.id = ?", (analysis_id,)).fetchone()
         if row is None:
             raise err(NOT_FOUND)
