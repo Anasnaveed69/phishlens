@@ -7,6 +7,9 @@ const state = { user: null, csrf: null, perms: new Set() };
 
 // ------------------------------------------------------------------ helpers
 function h(tag, attrs = {}, ...children) {
+  if (tag === "table" && !(attrs && attrs["data-bare"])) {
+    return h("div", { class: "table-wrap" }, h("table", { ...attrs, "data-bare": true }, ...children));
+  }
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})) {
     if (v === null || v === undefined || v === false) continue;
@@ -14,7 +17,7 @@ function h(tag, attrs = {}, ...children) {
     else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
     else el.setAttribute(k, v === true ? "" : v);
   }
-  for (const c of children.flat()) {
+  for (const c of children.flat(Infinity)) {
     if (c === null || c === undefined || c === false) continue;
     el.append(c instanceof Node ? c : document.createTextNode(String(c)));
   }
@@ -78,7 +81,13 @@ function setSession(data) {
   state.perms = new Set(data.permissions);
 }
 
+// Each navigation gets a token; an async view that finishes after the user has already moved on
+// must not overwrite the newer screen (found by the E2E suite: quick filter changes showed stale rows).
+let navToken = 0;
+let renderToken = 0;
+
 function render(...nodes) {
+  if (renderToken !== navToken) return;
   const v = $("#view");
   v.replaceChildren(...nodes);
   v.focus();
@@ -121,6 +130,8 @@ function loginView() {
     err,
     h("div", { class: "row" }, h("button", { class: "primary", type: "submit" }, "Sign in")),
   );
+  $("#page-title").textContent = "PhishLens — Sign in";
+  document.title = "Sign in · PhishLens";
   render(h("section", { class: "card narrow" }, h("h2", {}, "Sign in"), form));
 }
 
@@ -322,7 +333,7 @@ async function historyView(params) {
   ));
   render(h("section", { class: "card" }, h("h2", {}, sample ? "Runs of one page" : "Analysis history"), stats, filters,
     h("div", { class: "row" }, compareBtn),
-    h("table", {}, h("thead", {}, h("tr", {}, ["", "When", "Page", "Decision", "Score", "Severity", "Config", "Label"].map((x) => h("th", {}, x)))),
+    h("table", {}, h("thead", {}, h("tr", {}, [h("span", { class: "sr-only" }, "Select"), "When", "Page", "Decision", "Score", "Severity", "Config", "Label"].map((x) => h("th", { scope: "col" }, x)))),
       h("tbody", {}, rows.length ? rows : h("tr", {}, h("td", { colspan: 8, class: "muted" }, "No analyses yet."))))));
 }
 
@@ -456,7 +467,7 @@ async function adminView(tab = "config") {
 async function adminConfig(body) {
   const { version, config, rules } = await api("/api/admin/config");
   const hist = await api("/api/admin/config/history");
-  const num = (name, val, step) => h("input", { name, type: "number", min: 0, max: 1, step, value: val, required: true });
+  const num = (name, val, step) => h("input", { id: `cfg-${name}`, name, type: "number", min: 0, max: 1, step, value: val, required: true });
   const form = h("form", {
     onsubmit: async (e) => {
       e.preventDefault();
@@ -473,13 +484,13 @@ async function adminConfig(body) {
   },
     h("p", { class: "muted" }, `Current version: v${version}`),
     h("div", { class: "grid2" },
-      h("div", {}, h("label", {}, "Phishing threshold"), num("phishing_threshold", config.phishing_threshold, 0.01)),
-      h("div", {}, h("label", {}, "Suspicious threshold"), num("suspicious_threshold", config.suspicious_threshold, 0.01))),
-    h("label", {}, "ML weight ", h("span", { class: "hint" }, "(0 = rules only, 1 = model only)")), num("ml_weight", config.ml_weight, 0.05),
+      h("div", {}, h("label", { for: "cfg-phishing_threshold" }, "Phishing threshold"), num("phishing_threshold", config.phishing_threshold, 0.01)),
+      h("div", {}, h("label", { for: "cfg-suspicious_threshold" }, "Suspicious threshold"), num("suspicious_threshold", config.suspicious_threshold, 0.01))),
+    h("label", { for: "cfg-ml_weight" }, "ML weight ", h("span", { class: "hint" }, "(0 = rules only, 1 = model only)")), num("ml_weight", config.ml_weight, 0.05),
     h("h3", {}, "Enabled rules"),
     rules.map((r) => h("label", { class: "hint" }, h("input", { type: "checkbox", name: "rule", value: r.id, checked: !config.disabled_rules.includes(r.id) }),
       ` ${r.id} ${r.name} (w=${r.weight}, ${r.severity})`)),
-    h("label", {}, "Reason for change"), h("input", { name: "reason", type: "text", minlength: 3, maxlength: 200, required: true }),
+    h("label", { for: "cfg-reason" }, "Reason for change"), h("input", { id: "cfg-reason", name: "reason", type: "text", minlength: 3, maxlength: 200, required: true }),
     h("div", { class: "row" }, h("button", { class: "primary", type: "submit" }, "Save new version")),
   );
   body.replaceChildren(form, h("h3", {}, "History"),
@@ -506,7 +517,7 @@ async function adminUsers(body) {
     h("button", { class: "primary", type: "submit" }, "Add user"));
   const toggle = async (u) => {
     if (!window.confirm(`${u.disabled ? "Enable" : "Disable"} ${u.username}?`)) return;
-    try { await api(`/api/admin/users/${u.id}`, { method: "PATCH", json: { disabled: !u.disabled } }); adminView("users"); }
+    try { await api(`/api/admin/users/${u.id}`, { method: "PATCH", json: { disabled: !u.disabled, confirm: true } }); adminView("users"); }
     catch (ex) { toast(ex.message, true); }
   };
   body.replaceChildren(form, h("table", {},
@@ -539,20 +550,53 @@ async function adminModel(body) {
     m.test_metrics ? [h("h3", {}, "Held-out test metrics (from training)"),
       h("dl", { class: "kv" }, Object.entries(m.test_metrics).map(([k, v]) => [h("dt", {}, k), h("dd", { class: "mono" }, typeof v === "object" ? JSON.stringify(v) : String(v))]))] : null,
     h("div", { class: "row" }, can("config:write") && h("button", { onclick: async () => {
-      try { const r = await api("/api/admin/model/reload", { method: "POST" }); toast(`Model status: ${r.status}`); adminView("model"); }
+      if (!window.confirm("Reload the model from disk? New analyses will use whatever model file is there now.")) return;
+      try { const r = await api("/api/admin/model/reload", { method: "POST", json: { confirm: true } }); toast(`Model status: ${r.status}`); adminView("model"); }
       catch (ex) { toast(ex.message, true); }
-    } }, "Reload model from disk")));
+    } }, "Reload model from disk")),
+    can("config:write") && retentionCard());
+}
+
+function retentionCard() {
+  const out = h("span", { class: "hint", role: "status" });
+  const form = h("form", {
+    class: "row",
+    onsubmit: async (e) => {
+      e.preventDefault();
+      const days = parseInt(form.days.value, 10);
+      if (!window.confirm(`Delete stored raw pages older than ${days} day(s)? Results and reports are kept, but those pages can no longer be re-analysed.`)) return;
+      try {
+        const r = await api("/api/admin/samples/purge", { method: "POST", json: { older_than_days: days, confirm: true } });
+        out.textContent = `Deleted ${r.purged} stored page(s).`;
+      } catch (ex) { toast(ex.message, true); }
+    },
+  },
+    h("label", { for: "ret-days" }, "Delete stored pages older than"),
+    h("input", { id: "ret-days", name: "days", type: "number", min: 0, max: 3650, value: 30, required: true }),
+    h("span", {}, "days"),
+    h("button", { class: "danger", type: "submit" }, "Purge"), out);
+  return [h("h3", {}, "Data retention"),
+    h("p", { class: "muted" }, "Raw pages are only needed to re-analyse; decisions, reasons and short evidence stay in history. ",
+      "Set PHISHLENS_RETENTION_DAYS to purge automatically at startup."), form];
 }
 
 // ------------------------------------------------------------------ router
 async function route() {
+  const token = ++navToken;
   if (!state.user) {
     try { setSession(await api("/api/auth/me")); } catch { resetSession(); }
   }
+  if (token !== navToken) return;  // a newer navigation started while we were checking the session
+  renderToken = token;
   paintChrome();
   if (!state.user) return loginView();
 
   const [path, query] = (location.hash.slice(1) || "/").split("?");
+  const titles = { analyze: "Analyze a page", result: "Analysis result", dataset: "Import dataset", admin: "Administration",
+    history: "Analysis history", dashboard: "Dashboard", compare: "Compare analyses", account: "Account" };
+  const section = path.split("/").filter(Boolean)[0] || "dashboard";
+  $("#page-title").textContent = `PhishLens — ${titles[section] || "Dashboard"}`;
+  document.title = `${titles[section] || "Dashboard"} · PhishLens`;
   const params = new URLSearchParams(query || "");
   const parts = path.split("/").filter(Boolean);
   switch (parts[0]) {
