@@ -1,6 +1,8 @@
 # Test plan and results
 
-Automated tests: `pytest -q` → **71 / 71 passing** (engine, API, security misuse).
+Automated tests: `pytest -q` → **222 / 222 passing**: engine, API, security misuse, authorization matrix,
+property-based fuzzing and 26 browser end-to-end tests (incl. accessibility and phone layout). Coverage 92.6%
+(line + branch), enforced ≥ 90% in CI. Full QA audit: [qa-report.md](qa-report.md).
 CI runs them on every push (`.github/workflows/tests.yml`). Acceptance: ≥ 80% passing and no open critical
 authorization, injection, secret-exposure or unsafe-file-handling defects — **met**.
 

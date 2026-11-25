@@ -16,8 +16,8 @@ Write your name next to a role.
 - [ ] Forced password change on first login
 - [ ] Session refresh / "remember me" decision (document it either way)
 - [ ] Pagination totals for `/api/analyses` and `/api/samples`
-- [ ] Sample deletion for admins (soft delete, audited, confirmation)
-- [ ] Backup / restore instructions for `data/` (recovery section of user guide)
+- [x] Data retention: admin purge of stored pages (audited, confirmed) + auto-purge setting
+- [x] Backup / restore instructions (data/, secrets/, models/) in the user guide
 
 ## B — Security engine & evaluation · owner: ______
 - [x] Real dataset (PhreshPhish) in `pages + labels.csv` format (see docs/dataset.md)
@@ -31,7 +31,7 @@ Write your name next to a role.
 - [x] Dashboard page: counts by decision, recent high-severity results, latency stats
 - [x] Side-by-side compare of two analyses (normal vs adverse sample)
 - [x] Printable HTML/PDF report export
-- [ ] Accessibility pass (keyboard navigation, labels, contrast) + responsive check on phone
+- [x] Accessibility pass (labels, contrast, headings — axe in CI) + responsive check on phone
 - [ ] Screenshots for the final report
 
 ## D — Automation, security testing, packaging, QA · owner: ______

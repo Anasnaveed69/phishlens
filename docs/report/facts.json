@@ -1,11 +1,11 @@
 {
   "repo_url": "https://github.com/Anasnaveed69/phishlens",
-  "report_date": "15 November 2026",
+  "report_date": "26 November 2026",
   "n_features": 53,
   "n_features_total": 58,
   "n_rules": 26,
-  "tests_passed": 71,
-  "tests_total": 71,
+  "tests_passed": 222,
+  "tests_total": 222,
   "ci_pythons": "3.11 and 3.12",
   "threats": [
     [
@@ -87,9 +87,24 @@
       "T16",
       "Model learns a dataset shortcut (T, integrity of decisions) \u2014 ML model",
       "Explanations expose it (page-size features dominated small benign pages); size-feature ablation evaluated; brand-ownership feature; fixtures checked as a generalisation test"
+    ],
+    [
+      "T17",
+      "Over-retention of hostile/sensitive page content (I) \u2014 stored samples",
+      "Admin purge + PHISHLENS_RETENTION_DAYS auto-purge of raw HTML; results keep only truncated evidence; purge is confirmed and audited"
+    ],
+    [
+      "T18",
+      "Unconfirmed privilege change / model swap (E/T) \u2014 admin API",
+      "Server-side confirm required for role/disable changes, config changes, model reload and purge; sessions of a changed user are revoked"
+    ],
+    [
+      "T19",
+      "Silent failures (R) \u2014 all",
+      "Unhandled errors return a generic 500 with a reference id and are written to the audit log as system.error"
     ]
   ],
-  "n_threats": 16,
+  "n_threats": 19,
   "fixture_pages": 7,
   "fixture_results": [
     {

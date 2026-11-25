@@ -20,6 +20,8 @@
   re-chained without the key, but someone holding both could rewrite it, and deleting the newest rows is only
   detectable against an external copy of the chain head (returned by `/api/admin/audit/verify`).
 * A model file plus its metadata can be swapped together unless `PHISHLENS_MODEL_SHA256` pins the hash.
+* Single-process design: the write lock and the rate limiters live in the server process, so run one worker
+  (the supported local setup); several workers would need a shared store such as Redis.
 * The login limiter is keyed on IP; on a shared machine (all 127.0.0.1) repeated bad logins temporarily lock an
   account — a deliberate trade-off against brute force.
 
