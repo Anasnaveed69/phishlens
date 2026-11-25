@@ -12,7 +12,8 @@ from engine.pipeline import analyze
 
 from . import audit
 from .config import settings
-from .db import current_config, new_id, now_iso
+from .db import current_config, new_id, now_iso, read_conn
+from datetime import UTC
 
 log = logging.getLogger("phishlens")
 
@@ -57,6 +58,10 @@ def store_sample(conn: sqlite3.Connection, *, filename: str, html: str, size: in
     if existing:
         row = dict(existing)
         changes = {}
+        if row.get("purged_at"):  # the same page uploaded again after a purge: store it again
+            sample_path(digest).write_text(html, encoding="utf-8")
+            conn.execute("UPDATE samples SET purged_at = NULL WHERE id = ?", (row["id"],))
+            row["purged_at"] = None
         # Same bytes, newly declared URL/label: the submitter's latest declaration wins (and is audited),
         # instead of silently analysing with the old URL (independent review finding S4).
         if source_url and source_url != row["source_url"]:
@@ -81,12 +86,23 @@ def store_sample(conn: sqlite3.Connection, *, filename: str, html: str, size: in
     return dict(row), False
 
 
-def run_analysis(conn: sqlite3.Connection, sample: dict, user_id: str, username: str, role: str,
-                 ip: str | None) -> dict:
-    html = sample_path(sample["sha256"]).read_text(encoding="utf-8")
-    config_version, config = current_config(conn)
-    result = analyze(html, sample["source_url"], config, _model)
+def compute_analysis(html: str, source_url: str | None, conn: sqlite3.Connection | None = None) -> tuple[int, dict]:
+    """Parse, features, rules, model -> (config_version, result). Reads the config through `conn`
+    when given (same transaction as the save), otherwise through a read-only snapshot."""
+    if conn is not None:
+        config_version, config = current_config(conn)
+    else:
+        with read_conn() as rc:
+            config_version, config = current_config(rc)
+    result = analyze(html, source_url, config, _model)
     result["config_version"] = config_version
+    return config_version, result
+
+
+def save_analysis(conn: sqlite3.Connection, sample: dict, prepared: tuple[int, dict], user_id: str,
+                  username: str, role: str, ip: str | None) -> dict:
+    """Short write: store a computed result and its audit event."""
+    config_version, result = prepared
     analysis_id = new_id()
     created = now_iso()
     conn.execute(
@@ -102,3 +118,28 @@ def run_analysis(conn: sqlite3.Connection, sample: dict, user_id: str, username:
                           "rules_fired": [r["id"] for r in result["rules"]["fired"]],
                           "model_version": result["versions"]["model"], "config_version": config_version})
     return {"id": analysis_id, "sample_id": sample["id"], "created_at": created, **result}
+
+
+def run_analysis(conn: sqlite3.Connection, sample: dict, user_id: str, username: str, role: str,
+                 ip: str | None) -> dict:
+    """Compute + save inside the caller's write transaction (config read in the same transaction)."""
+    html = read_sample_html(sample)
+    return save_analysis(conn, sample, compute_analysis(html, sample["source_url"], conn), user_id, username, role, ip)
+
+
+def purge_raw_pages(conn: sqlite3.Connection, older_than_days: int) -> int:
+    """Remove stored HTML for samples older than N days (data minimisation). Returns how many."""
+    from datetime import datetime, timedelta
+    cutoff = (datetime.now(UTC) - timedelta(days=older_than_days)).isoformat(timespec="seconds")
+    rows = conn.execute("SELECT id, sha256 FROM samples WHERE created_at <= ? AND purged_at IS NULL", (cutoff,)).fetchall()
+    for r in rows:
+        sample_path(r["sha256"]).unlink(missing_ok=True)
+        conn.execute("UPDATE samples SET purged_at = ? WHERE id = ?", (now_iso(), r["id"]))
+    return len(rows)
+
+
+def read_sample_html(sample: dict) -> str:
+    if sample.get("purged_at"):
+        from .errors import SAMPLE_PURGED, err
+        raise err(SAMPLE_PURGED)
+    return sample_path(sample["sha256"]).read_text(encoding="utf-8")

@@ -8,7 +8,7 @@ but the score never exceeds 1. Admins can disable individual rules (stored in co
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable
+from collections.abc import Callable
 
 from .features import FeatureResult
 

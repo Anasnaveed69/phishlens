@@ -54,6 +54,11 @@ class Settings:
     # even if its .meta.json was edited too.
     model_sha256: str = field(default_factory=lambda: os.environ.get("PHISHLENS_MODEL_SHA256", "").strip().lower())
 
+    # Auto-delete stored raw pages older than this many days at startup (0 = keep forever).
+    retention_days: int = field(default_factory=lambda: _int("PHISHLENS_RETENTION_DAYS", 0))
+    # Interactive API docs at /api/docs. Handy locally; set to 0 for a shared deployment.
+    api_docs: bool = field(default_factory=lambda: os.environ.get("PHISHLENS_API_DOCS", "1") == "1")
+
     # Set to "1" only when served over HTTPS. Locally we run on http://127.0.0.1.
     cookie_secure: bool = field(default_factory=lambda: os.environ.get("PHISHLENS_COOKIE_SECURE", "0") == "1")
 

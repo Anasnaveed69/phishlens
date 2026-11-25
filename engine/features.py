@@ -368,7 +368,8 @@ def extract(html: str, url: str | None = None) -> FeatureResult:
                                     if re.search(r"display\s*:\s*none|visibility\s*:\s*hidden", t["style"], re.I))
 
     missing = [n for n in NUMERIC_FEATURES if n not in values]
-    assert not missing, f"feature(s) not computed: {missing}"
+    if missing:  # programming error; never silently feed the model a short vector
+        raise RuntimeError(f"feature(s) not computed: {missing}")
     return FeatureResult(values=values, evidence=evidence, page_domain=page_domain, brands_found=brands)
 
 

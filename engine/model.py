@@ -18,7 +18,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 
 import joblib
@@ -51,7 +51,7 @@ class LoadedModel:
         x = np.array([[float(features.values[n]) for n in order]])
         prob = float(self.pipeline.predict_proba(x)[0, 1])
         contrib, unit = explain_contributions(self.pipeline, x)
-        ranked = sorted(zip(order, contrib, x[0]), key=lambda t: abs(t[1]), reverse=True)
+        ranked = sorted(zip(order, contrib, x[0], strict=False), key=lambda t: abs(t[1]), reverse=True)
         top = [
             {"feature": name, "value": round(float(val), 4), "contribution": round(float(c), 4),
              "direction": "towards phishing" if c > 0 else "towards benign"}
@@ -139,13 +139,13 @@ def train(X: list[list[float]], y: list[int], model_path: Path, dataset_note: st
 
     model_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(pipe, model_path)
-    version = "lr-" + datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    version = "lr-" + datetime.now(UTC).strftime("%Y%m%d%H%M%S")
     meta = {
         "version": version,
         "algorithm": "StandardScaler + LogisticRegression(class_weight=balanced)",
         "feature_version": FEATURE_VERSION,
         "feature_order": NUMERIC_FEATURES,
-        "trained_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "trained_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "n_train": int(len(y_tr)),
         "n_test": int(len(y_te)),
         "seed": seed,
