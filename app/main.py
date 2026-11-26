@@ -1,6 +1,8 @@
-"""PhishLens API entry point.
+"""PhishLens — API entry point.
 
-Run locally:  uvicorn app.main:app --reload   (then open http://127.0.0.1:8000)
+Run locally:
+    uvicorn app.main:app --reload
+Then open http://127.0.0.1:8000 (API docs at /api/docs).
 """
 from __future__ import annotations
 
@@ -18,6 +20,7 @@ from .errors import install_handlers
 from .routers import admin, analyses, auth, dashboard, samples
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
 FRONTEND = BASE_DIR / "frontend"
 
 
