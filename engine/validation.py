@@ -1,7 +1,7 @@
-"""Input validation for uploaded pages, declared URLs and dataset archives.
+"""Input validation for uploaded pages, declared URLs, and dataset archives.
 
-Pure functions: no DB, no web framework, so they're easy to unit test.
-Nothing here ever executes, renders or fetches the submitted content.
+Pure functions — no DB, no web framework — so they are easy to unit test.
+Nothing here ever executes, renders, or fetches the submitted content.
 """
 from __future__ import annotations
 

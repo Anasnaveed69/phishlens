@@ -1,6 +1,7 @@
-"""End-to-end analysis: validated page -> features -> rules -> ML -> explainable decision.
+"""End-to-end analysis pipeline: validated page → features → rules → ML → decision.
 
-The output stores every version, threshold and reason needed to reproduce the decision.
+The output includes every version, threshold, and reason needed to reproduce the
+decision independently.
 """
 from __future__ import annotations
 

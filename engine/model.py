@@ -1,17 +1,21 @@
 """ML classifier (FR-4).
 
-Two explainable model families are supported; scripts/evaluate.py picks the better one by
+Two model families are supported; scripts/evaluate.py picks the better one by
 5-fold cross-validation on the training split only:
 
-* LogisticRegression (with StandardScaler): contribution of feature i = coef_i * scaled_x_i
-  (log-odds units). Sum of contributions + intercept = the model's log-odds exactly.
-* RandomForest: per-feature contributions via path decomposition (Saabas / "treeinterpreter"):
-  walking each tree from root to leaf, the change in P(phishing) at every split is credited to
-  the split feature. Bias + sum of contributions = the forest's probability exactly.
+* LogisticRegression (with StandardScaler) — contribution of feature i:
+    coef_i × scaled_x_i  (log-odds units).
+  Sum of contributions + intercept equals the model's log-odds exactly.
 
-Integrity: joblib files are pickles and can run code when loaded, so we only load a
-model whose SHA-256 matches the value recorded in its metadata file next to it, and
-both files live in a folder only the app owner can write to.
+* RandomForest — per-feature contributions via path decomposition (Saabas):
+  walking each tree from root to leaf, the change in P(phishing) at every
+  split is credited to the split feature.  Bias + sum equals the forest's
+  probability exactly.
+
+Integrity: joblib files are pickles and can execute arbitrary code on load,
+so we only load a model whose SHA-256 matches the value recorded in its
+companion metadata file, and both files must live in a folder only the app
+owner can write to.
 """
 from __future__ import annotations
 

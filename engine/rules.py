@@ -1,14 +1,18 @@
-"""Baseline rules (FR-3).
+"""Baseline detection rules (FR-3).
 
-Each rule has a stable id, a human-readable name, a weight in (0, 1], a severity and a
-reason template. Rules are combined with a noisy-OR:  score = 1 - Π(1 - weight_i)
-over fired rules, so one strong indicator counts a lot and several weak ones add up,
-but the score never exceeds 1. Admins can disable individual rules (stored in config).
+Each rule has a stable id, a human-readable name, a weight in (0, 1], a severity,
+and a reason template.  Rules are combined with a noisy-OR:
+
+    score = 1 - Π(1 - weight_i)   over all fired rules
+
+One strong indicator dominates, several weak ones accumulate, but the score is
+always bounded by 1.  Admins can disable individual rules; the choice is stored
+in the versioned config table so every analysis can be reproduced exactly.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from .features import FeatureResult
 
@@ -27,6 +31,7 @@ class Rule:
 
 
 def _v(name: str):
+    """Return a function that reads one numeric feature value (0 if missing)."""
     return lambda fr: fr.values.get(name, 0)
 
 
