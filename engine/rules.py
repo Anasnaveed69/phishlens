@@ -30,12 +30,13 @@ class Rule:
     evidence_key: str | None = None
 
 
-def _v(name: str):
-    """Return a function that reads one numeric feature value (0 if missing)."""
+def _v(name: str) -> Callable[[FeatureResult], float]:
+    """Return a callable that reads one numeric feature value (defaults to 0 if absent)."""
     return lambda fr: fr.values.get(name, 0)
 
 
 RULES: list[Rule] = [
+    # -- URL structure indicators ------------------------------------------
     Rule("R01", "IP address used as host", 0.45, "high", lambda f: _v("has_ip_host")(f) == 1,
          "The URL uses a raw IP address instead of a domain name.", "has_ip_host"),
     Rule("R02", "'@' symbol in URL", 0.35, "medium", lambda f: _v("has_at_symbol")(f) == 1,
@@ -84,6 +85,8 @@ RULES: list[Rule] = [
          "Most links go nowhere ('#' or javascript:), common in phishing kits."),
 ]
 
+# Extended ruleset (rules-1.1 / rules-2.x) — added after the PhreshPhish error
+# analysis identified high-volume false-positive and false-negative patterns.
 RULES += [
     Rule("R16", "Form submits to an IP address", 0.45, "high", lambda f: _v("form_action_ip")(f) > 0,
          "A form sends its data straight to a raw IP address.", "form_action_ip"),
