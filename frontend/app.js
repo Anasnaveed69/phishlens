@@ -1,6 +1,7 @@
-// PhishLens frontend. Plain JS, no build step.
-// SECURITY: all text coming from the server (which may originate from an uploaded page)
-// is inserted with textContent via h(), never innerHTML.
+// PhishLens — browser UI. Plain JS, no build step.
+//
+// SECURITY: all text originating from the server (which may contain user-uploaded
+// page content) is inserted via textContent through h(), never innerHTML.
 "use strict";
 
 const state = { user: null, csrf: null, perms: new Set() };
