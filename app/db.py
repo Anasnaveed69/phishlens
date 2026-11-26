@@ -111,6 +111,8 @@ CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_events(action);
 """
 
 DEFAULT_CONFIG = {
+    # Thresholds are calibrated by scripts/evaluate.py via cross-validation;
+    # these hand-set defaults are only used before the first model is trained.
     "phishing_threshold": 0.70,    # final score >= this -> phishing
     "suspicious_threshold": 0.40,  # final score >= this -> suspicious
     "ml_weight": 0.60,             # final = ml_weight * ml + (1 - ml_weight) * rules
@@ -131,6 +133,8 @@ def connect() -> sqlite3.Connection:
     conn = sqlite3.connect(settings.db_path, timeout=30, isolation_level=None)  # explicit transactions
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    # WAL mode: readers never block writers and writers never block readers,
+    # which is essential for the read_conn / get_conn split (see below).
     conn.execute("PRAGMA journal_mode = WAL")
     return conn
 
