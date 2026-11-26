@@ -19,6 +19,7 @@ ACTIONS = {
 
 
 def decide(score: float, config: dict) -> str:
+    """Map a combined [0, 1] risk score to a three-way decision label."""
     if score >= config["phishing_threshold"]:
         return "phishing"
     if score >= config["suspicious_threshold"]:
@@ -27,6 +28,11 @@ def decide(score: float, config: dict) -> str:
 
 
 def analyze(html: str, url: str | None, config: dict, model: LoadedModel | None) -> dict:
+    """Run the full analysis pipeline and return an explainable result dict.
+
+    Scoring (hybrid mode):  score = ml_weight × ML_prob + (1 - ml_weight) × rule_score
+    Confidence:             |score - 0.5| × 2  — 0 means on the fence, 1 means certain
+    """
     started = time.perf_counter()
     features = extract(html, url)
     rule_result = evaluate(features, config.get("disabled_rules"))
@@ -50,7 +56,9 @@ def analyze(html: str, url: str | None, config: dict, model: LoadedModel | None)
     return {
         "decision": decision,
         "score": score,
-        "confidence": round(abs(score - 0.5) * 2, 4),  # 0 = on the fence, 1 = very sure
+        # Confidence: distance from the decision boundary, normalised to [0, 1].
+        # score=0.5 → 0.0 (completely uncertain); score=0 or 1 → 1.0 (certain).
+        "confidence": round(abs(score - 0.5) * 2, 4),
         "severity": severity,
         "mode": mode,
         "recommended_action": ACTIONS[decision],
