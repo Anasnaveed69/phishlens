@@ -8,17 +8,17 @@ detectable against an external copy of the last hash, which /api/admin/audit/ver
 """
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import hmac
 import json
 import os
-import secrets as _secrets
 import re
+import secrets as _secrets
 import sqlite3
 from typing import Any
 
 from .db import new_id, now_iso
-import contextlib
 
 GENESIS = "0" * 64
 
