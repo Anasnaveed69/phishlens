@@ -18,10 +18,12 @@ COOKIE_NAME = "phishlens_session"
 
 
 def _hash(token: str) -> str:
+    """Hash a raw session token with SHA-256 before storing or querying."""
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def create_session(conn: sqlite3.Connection, user_id: str) -> tuple[str, str]:
+    """Create a new server-side session and return (raw_token, csrf_token)."""
     token = secrets.token_urlsafe(32)
     csrf = secrets.token_urlsafe(32)
     expires = datetime.now(UTC) + timedelta(minutes=settings.session_ttl_minutes)
