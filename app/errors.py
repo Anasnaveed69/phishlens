@@ -1,6 +1,7 @@
-"""Stable error codes. Clients rely on `code`; messages are generic on purpose.
+"""Stable API error codes and global exception handlers.
 
-Never put stack traces, SQL, file paths or internal details in a response.
+Clients rely on the `code` field; messages are intentionally generic.
+Never include stack traces, SQL, file paths, or internal details in a response.
 """
 from __future__ import annotations
 

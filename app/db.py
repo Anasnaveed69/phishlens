@@ -1,9 +1,9 @@
-"""Repository layer: SQLite connection + schema.
+"""Repository layer: SQLite connection management and schema definition.
 
 Rules for everyone touching this file:
-  * ALWAYS use parameterized queries (`?` placeholders). Never build SQL with f-strings.
-  * IDs are generated server-side (uuid4), never taken from the client.
-  * audit_events is append-only: triggers below block UPDATE and DELETE.
+  * ALWAYS use parameterised queries (? placeholders). Never build SQL with f-strings.
+  * IDs are generated server-side (uuid4) and never taken from the client.
+  * audit_events is append-only: the triggers below block UPDATE and DELETE.
 """
 from __future__ import annotations
 
