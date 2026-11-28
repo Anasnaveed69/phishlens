@@ -14,10 +14,12 @@ MIN_LENGTH = 10
 
 
 def hash_password(password: str) -> str:
+    """Hash a plaintext password using Argon2id."""
     return _ph.hash(password)
 
 
 def verify_password(password_hash: str | None, password: str) -> bool:
+    """Verify a password against a stored Argon2id hash in constant-ish time."""
     try:
         return _ph.verify(password_hash or _DUMMY_HASH, password) and password_hash is not None
     except (VerifyMismatchError, VerificationError, InvalidHashError):
@@ -25,6 +27,7 @@ def verify_password(password_hash: str | None, password: str) -> bool:
 
 
 def password_problems(password: str) -> list[str]:
+    """Return human-readable policy violations for a candidate password."""
     problems = []
     if len(password) < MIN_LENGTH:
         problems.append(f"at least {MIN_LENGTH} characters")
