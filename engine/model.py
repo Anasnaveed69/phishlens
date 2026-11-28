@@ -1,24 +1,28 @@
 """ML classifier (FR-4).
 
-Two explainable model families are supported; scripts/evaluate.py picks the better one by
+Two model families are supported; scripts/evaluate.py picks the better one by
 5-fold cross-validation on the training split only:
 
-* LogisticRegression (with StandardScaler): contribution of feature i = coef_i * scaled_x_i
-  (log-odds units). Sum of contributions + intercept = the model's log-odds exactly.
-* RandomForest: per-feature contributions via path decomposition (Saabas / "treeinterpreter"):
-  walking each tree from root to leaf, the change in P(phishing) at every split is credited to
-  the split feature. Bias + sum of contributions = the forest's probability exactly.
+* LogisticRegression (with StandardScaler) — contribution of feature i:
+    coef_i × scaled_x_i  (log-odds units).
+  Sum of contributions + intercept equals the model's log-odds exactly.
 
-Integrity: joblib files are pickles and can run code when loaded, so we only load a
-model whose SHA-256 matches the value recorded in its metadata file next to it, and
-both files live in a folder only the app owner can write to.
+* RandomForest — per-feature contributions via path decomposition (Saabas):
+  walking each tree from root to leaf, the change in P(phishing) at every
+  split is credited to the split feature.  Bias + sum equals the forest's
+  probability exactly.
+
+Integrity: joblib files are pickles and can execute arbitrary code on load,
+so we only load a model whose SHA-256 matches the value recorded in its
+companion metadata file, and both files must live in a folder only the app
+owner can write to.
 """
 from __future__ import annotations
 
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 
 import joblib
@@ -51,7 +55,7 @@ class LoadedModel:
         x = np.array([[float(features.values[n]) for n in order]])
         prob = float(self.pipeline.predict_proba(x)[0, 1])
         contrib, unit = explain_contributions(self.pipeline, x)
-        ranked = sorted(zip(order, contrib, x[0]), key=lambda t: abs(t[1]), reverse=True)
+        ranked = sorted(zip(order, contrib, x[0], strict=False), key=lambda t: abs(t[1]), reverse=True)
         top = [
             {"feature": name, "value": round(float(val), 4), "contribution": round(float(c), 4),
              "direction": "towards phishing" if c > 0 else "towards benign"}
@@ -139,13 +143,13 @@ def train(X: list[list[float]], y: list[int], model_path: Path, dataset_note: st
 
     model_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(pipe, model_path)
-    version = "lr-" + datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    version = "lr-" + datetime.now(UTC).strftime("%Y%m%d%H%M%S")
     meta = {
         "version": version,
         "algorithm": "StandardScaler + LogisticRegression(class_weight=balanced)",
         "feature_version": FEATURE_VERSION,
         "feature_order": NUMERIC_FEATURES,
-        "trained_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "trained_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "n_train": int(len(y_tr)),
         "n_test": int(len(y_te)),
         "seed": seed,

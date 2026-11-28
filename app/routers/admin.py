@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, model_validator
 from engine.rules import RULES, RULES_BY_ID
 
 from .. import audit, services
-from ..db import current_config, get_conn, new_id, now_iso
+from ..db import current_config, get_conn, new_id, now_iso, read_conn
 from ..errors import CONFLICT, INVALID_INPUT, NOT_FOUND, err
 from ..security.deps import Principal, client_ip, require
 from ..security.passwords import hash_password, password_problems
@@ -39,7 +39,7 @@ class ConfigIn(BaseModel):
 
 @router.get("/config")
 def get_config(principal: Principal = Depends(require("config:read"))):
-    with get_conn() as conn:
+    with read_conn() as conn:
         version, cfg = current_config(conn)
     return {"version": version, "config": cfg,
             "rules": [{"id": r.id, "name": r.name, "weight": r.weight, "severity": r.severity} for r in RULES]}
@@ -67,7 +67,7 @@ def update_config(body: ConfigIn, request: Request, principal: Principal = Depen
 
 @router.get("/config/history")
 def config_history(principal: Principal = Depends(require("config:read"))):
-    with get_conn() as conn:
+    with read_conn() as conn:
         rows = conn.execute("SELECT * FROM config_versions ORDER BY version DESC LIMIT 100").fetchall()
     return {"items": [{**dict(r), "config_json": json.loads(r["config_json"])} for r in rows]}
 
@@ -82,11 +82,16 @@ class UserIn(BaseModel):
 class UserPatch(BaseModel):
     role: str | None = Field(default=None, pattern="^(admin|analyst|viewer)$")
     disabled: bool | None = None
+    confirm: bool = False  # high-impact: changes privileges / ends sessions, so the client must confirm
+
+
+class Confirm(BaseModel):
+    confirm: bool = False
 
 
 @router.get("/users")
 def list_users(principal: Principal = Depends(require("user:manage"))):
-    with get_conn() as conn:
+    with read_conn() as conn:
         rows = conn.execute("SELECT id, username, role, disabled, created_at FROM users ORDER BY created_at").fetchall()
     return {"items": [dict(r) for r in rows]}
 
@@ -109,6 +114,8 @@ def create_user(body: UserIn, request: Request, principal: Principal = Depends(r
 
 @router.patch("/users/{user_id}")
 def update_user(user_id: str, body: UserPatch, request: Request, principal: Principal = Depends(require("user:manage"))):
+    if not body.confirm:
+        raise err(INVALID_INPUT, "Role or status changes must be confirmed.", fields=["confirm"])
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
         if row is None:
@@ -139,9 +146,10 @@ def list_audit(action: str | None = None, outcome: str | None = None, actor: str
         if val:
             where.append(f"{col} = ?")  # column names are fixed above, values are parameterized
             params.append(val[:64])
-    sql = "SELECT * FROM audit_events" + (" WHERE " + " AND ".join(where) if where else "")
+    # Column names come from the fixed tuple above, never from the request; values are bound parameters.
+    sql = "SELECT * FROM audit_events" + (" WHERE " + " AND ".join(where) if where else "")  # noqa: S608  # nosec B608
     sql += " ORDER BY seq DESC LIMIT ? OFFSET ?"
-    with get_conn() as conn:
+    with read_conn() as conn:
         rows = conn.execute(sql, params + [limit, offset]).fetchall()
     return {"items": [{**dict(r), "details": json.loads(r["details"])} for r in rows]}
 
@@ -161,10 +169,31 @@ def get_model(principal: Principal = Depends(require("config:read"))):
 
 
 @router.post("/model/reload")
-def reload_model(request: Request, principal: Principal = Depends(require("config:write"))):
+def reload_model(body: Confirm, request: Request, principal: Principal = Depends(require("config:write"))):
+    if not body.confirm:
+        raise err(INVALID_INPUT, "Reloading the model must be confirmed.", fields=["confirm"])
     status = services.load_model()
     with get_conn() as conn:
         audit.record(conn, action="model.reload", actor=principal.username, role=principal.role, ip=client_ip(request),
                      outcome="success" if status == "loaded" else "failure",
                      details={"status": status, "version": services.model_info().get("version")})
     return services.model_info()
+
+
+# ---------------------------------------------------------------- data retention
+class PurgeIn(BaseModel):
+    older_than_days: int = Field(ge=0, le=3650)
+    confirm: bool = False
+
+
+@router.post("/samples/purge")
+def purge_samples(body: PurgeIn, request: Request, principal: Principal = Depends(require("config:write"))):
+    """Delete stored raw pages older than N days. Analyses (decision, reasons, short evidence) are kept,
+    so history and reports still work; re-analysing a purged page is no longer possible."""
+    if not body.confirm:
+        raise err(INVALID_INPUT, "Purging stored pages must be confirmed.", fields=["confirm"])
+    with get_conn() as conn:
+        purged = services.purge_raw_pages(conn, body.older_than_days)
+        audit.record(conn, action="sample.purge", actor=principal.username, role=principal.role, ip=client_ip(request),
+                     details={"older_than_days": body.older_than_days, "purged": purged})
+    return {"purged": purged, "older_than_days": body.older_than_days}

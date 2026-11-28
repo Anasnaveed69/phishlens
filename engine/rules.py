@@ -1,14 +1,18 @@
-"""Baseline rules (FR-3).
+"""Baseline detection rules (FR-3).
 
-Each rule has a stable id, a human-readable name, a weight in (0, 1], a severity and a
-reason template. Rules are combined with a noisy-OR:  score = 1 - Π(1 - weight_i)
-over fired rules, so one strong indicator counts a lot and several weak ones add up,
-but the score never exceeds 1. Admins can disable individual rules (stored in config).
+Each rule has a stable id, a human-readable name, a weight in (0, 1], a severity,
+and a reason template.  Rules are combined with a noisy-OR:
+
+    score = 1 - Π(1 - weight_i)   over all fired rules
+
+One strong indicator dominates, several weak ones accumulate, but the score is
+always bounded by 1.  Admins can disable individual rules; the choice is stored
+in the versioned config table so every analysis can be reproduced exactly.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from .features import FeatureResult
 
@@ -26,11 +30,13 @@ class Rule:
     evidence_key: str | None = None
 
 
-def _v(name: str):
+def _v(name: str) -> Callable[[FeatureResult], float]:
+    """Return a callable that reads one numeric feature value (defaults to 0 if absent)."""
     return lambda fr: fr.values.get(name, 0)
 
 
 RULES: list[Rule] = [
+    # -- URL structure indicators ------------------------------------------
     Rule("R01", "IP address used as host", 0.45, "high", lambda f: _v("has_ip_host")(f) == 1,
          "The URL uses a raw IP address instead of a domain name.", "has_ip_host"),
     Rule("R02", "'@' symbol in URL", 0.35, "medium", lambda f: _v("has_at_symbol")(f) == 1,
@@ -79,6 +85,8 @@ RULES: list[Rule] = [
          "Most links go nowhere ('#' or javascript:), common in phishing kits."),
 ]
 
+# Extended ruleset (rules-1.1 / rules-2.x) — added after the PhreshPhish error
+# analysis identified high-volume false-positive and false-negative patterns.
 RULES += [
     Rule("R16", "Form submits to an IP address", 0.45, "high", lambda f: _v("form_action_ip")(f) > 0,
          "A form sends its data straight to a raw IP address.", "form_action_ip"),

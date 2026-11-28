@@ -8,7 +8,7 @@ from engine.validation import InputError, read_dataset_zip, validate_label, vali
 
 from .. import audit, services
 from ..config import settings
-from ..db import get_conn
+from ..db import get_conn, read_conn
 from ..errors import FILE_TOO_LARGE, INVALID_INPUT, NOT_FOUND, RATE_LIMITED, UNSUPPORTED_TYPE, err
 from ..security.deps import Principal, client_ip, require
 from ..security.ratelimit import RateLimiter
@@ -55,9 +55,11 @@ def submit_page(
         url = validate_url(source_url)
         lab = validate_label(label)
     except InputError as exc:
-        raise _reject(exc, principal, request, "sample.upload")
+        raise _reject(exc, principal, request, "sample.upload") from None
 
     ip = client_ip(request)
+    # The analysis runs inside the (fair, in-process) write lock: with Python's GIL, serialising the
+    # CPU work gave the best throughput and the tightest tail latency in scripts/load_test.py.
     with get_conn() as conn:
         sample, duplicate = services.store_sample(conn, filename=page.filename, html=page.html, size=page.size_bytes,
                                                   source_url=url, label=lab, user_id=principal.user_id)
@@ -81,7 +83,7 @@ def import_dataset(
         content = _read_limited(file, settings.max_import_bytes)
         items = read_dataset_zip(content, settings.max_import_bytes, settings.max_import_files, settings.max_upload_bytes)
     except InputError as exc:
-        raise _reject(exc, principal, request, "dataset.import")
+        raise _reject(exc, principal, request, "dataset.import") from None
 
     # Imports count against the same per-user analysis budget: 1 request, plus 1 per page analysed.
     if not analyze_limiter.allow(principal.user_id, 1 + (len(items) if analyze else 0)):
@@ -122,7 +124,7 @@ def list_samples(limit: int = 50, offset: int = 0, label: str | None = None,
         sql += " WHERE label IS NULL"
     sql += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
     params += [limit, offset]
-    with get_conn() as conn:
+    with read_conn() as conn:
         rows = conn.execute(sql, params).fetchall()
     return {"items": [_public_sample(dict(r)) for r in rows]}
 
@@ -137,7 +139,7 @@ def set_label(sample_id: str, body: LabelIn, request: Request,
     try:
         lab = validate_label(body.label)
     except InputError as exc:
-        raise _reject(exc, principal, request, "sample.label")
+        raise _reject(exc, principal, request, "sample.label") from None
     with get_conn() as conn:
         row = conn.execute("SELECT id, label FROM samples WHERE id = ?", (sample_id,)).fetchone()
         if row is None:
@@ -161,4 +163,6 @@ def reanalyze(sample_id: str, request: Request, principal: Principal = Depends(r
 
 
 def _public_sample(s: dict) -> dict:
-    return {k: s[k] for k in ("id", "filename", "sha256", "source_url", "label", "size_bytes", "created_at")}
+    out = {k: s[k] for k in ("id", "filename", "sha256", "source_url", "label", "size_bytes", "created_at")}
+    out["purged"] = bool(s.get("purged_at"))
+    return out

@@ -11,6 +11,8 @@ from collections import defaultdict, deque
 
 
 class RateLimiter:
+    """Thread-safe sliding-window rate limiter keyed by client or action identifier."""
+
     def __init__(self, limit: int, window_seconds: float = 60.0):
         self.limit = limit
         self.window = window_seconds
@@ -33,5 +35,6 @@ class RateLimiter:
             return True
 
     def reset(self) -> None:
+        """Clear all recorded hit timestamps (intended for test isolation)."""
         with self._lock:
             self._hits.clear()

@@ -27,7 +27,7 @@ import json
 import statistics
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -35,12 +35,8 @@ sys.path.insert(0, str(ROOT))
 
 import joblib  # noqa: E402
 import numpy as np  # noqa: E402
-from sklearn.ensemble import RandomForestClassifier  # noqa: E402
-from sklearn.linear_model import LogisticRegression  # noqa: E402
 from sklearn.metrics import roc_auc_score  # noqa: E402
 from sklearn.model_selection import train_test_split  # noqa: E402
-from sklearn.pipeline import Pipeline  # noqa: E402
-from sklearn.preprocessing import StandardScaler  # noqa: E402
 
 from app.config import settings  # noqa: E402
 from app.db import DEFAULT_CONFIG  # noqa: E402
@@ -177,7 +173,7 @@ def main() -> None:
         "served@suspicious": metrics(yt, flag(hybrid, ts_best), hybrid),
         "served@phishing": metrics(yt, flag(hybrid, recommended["phishing_threshold"]), hybrid),
     }
-    pthr = recommended["phishing_threshold"]
+    recommended["phishing_threshold"]
     lr = served  # the model used for explanations / error analysis below is the served one
 
     # ---- full-pipeline latency on test pages ------------------------------
@@ -236,8 +232,8 @@ def main() -> None:
     # ---- top global features (LR coefficients, RF importances) --------------
     lr_model = model_mod.make_pipeline("logistic_regression", args.seed).fit(X[tr], y[tr])
     coefs = lr_model.named_steps["clf"].coef_[0]
-    top_lr = sorted(zip(USED, coefs), key=lambda t: abs(t[1]), reverse=True)[:12]
-    top_rf = sorted(zip(USED, rf.named_steps['clf'].feature_importances_), key=lambda t: t[1], reverse=True)[:12]
+    top_lr = sorted(zip(USED, coefs, strict=False), key=lambda t: abs(t[1]), reverse=True)[:12]
+    top_rf = sorted(zip(USED, rf.named_steps['clf'].feature_importances_, strict=False), key=lambda t: t[1], reverse=True)[:12]
 
     # ---- hand-written fixtures through the served configuration (generalisation check) ----
     fixtures = []
@@ -250,7 +246,7 @@ def main() -> None:
     print("fixtures:", [(f["file"], f["expected"], f["actual"], f["score"]) for f in fixtures])
 
     report = {
-        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "dataset": {"path": str(data), "name": args.name or data.name, "pages": len(items),
                     "phishing": n_ph, "benign": n_bn, "skipped": skipped,
                     "train": int(len(tr)), "test": int(len(te)), "test_size": args.test_size, "seed": args.seed},
@@ -280,7 +276,7 @@ def main() -> None:
         mp.parent.mkdir(parents=True, exist_ok=True)
         joblib.dump(served, mp)
         meta = {
-            "version": ("rf-" if served_algo == "random_forest" else "lr-") + datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S"),
+            "version": ("rf-" if served_algo == "random_forest" else "lr-") + datetime.now(UTC).strftime("%Y%m%d%H%M%S"),
             "algorithm": model_mod.ALGORITHM_LABELS[served_algo],
             "algorithm_id": served_algo,
             "recommended_config": recommended,
@@ -296,7 +292,7 @@ def main() -> None:
 
     # Feature matrix (no URLs, no page content): lets anyone retrain the exact served model
     # without the raw dataset -> scripts/train_from_features.py
-    test_set = set(int(i) for i in te)
+    test_set = {int(i) for i in te}
     with (out / "features.csv").open("w", newline="", encoding="utf-8") as f:
         wri = csv.writer(f)
         wri.writerow(["file", "split", "y", "rule_score"] + NUMERIC_FEATURES)
@@ -421,7 +417,7 @@ def markdown(r: dict) -> str:
               f"mean **{lat['mean_ms']} ms**, median {lat['median_ms']} ms, p95 {lat['p95_ms']} ms, max {lat['max_ms']} ms.", "",
               "## Most influential features", "", "![LR coefficients](lr_coefficients.png)", "",
               "| Logistic regression | coef | Random forest | importance |", "|---|---|---|---|"]
-    for a, b in zip(r["top_features_lr"], r["top_features_rf"]):
+    for a, b in zip(r["top_features_lr"], r["top_features_rf"], strict=False):
         lines.append(f"| {a['feature']} | {a['coef']} | {b['feature']} | {b['importance']} |")
     return "\n".join(lines) + "\n"
 

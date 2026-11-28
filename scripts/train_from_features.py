@@ -12,7 +12,7 @@ import argparse
 import csv
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -66,10 +66,10 @@ def main() -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(pipe, out)
     meta = {
-        "version": ev.get("saved_model") or f"{algo}-{datetime.now(timezone.utc):%Y%m%d%H%M%S}",
+        "version": ev.get("saved_model") or f"{algo}-{datetime.now(UTC):%Y%m%d%H%M%S}",
         "algorithm": model_mod.ALGORITHM_LABELS[algo], "algorithm_id": algo,
         "feature_version": FEATURE_VERSION, "feature_order": USED,
-        "trained_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "trained_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "n_train": len(train), "n_test": len(test), "seed": seed,
         "dataset": f"{ev['dataset']['name']} ({ev['dataset']['pages']} pages)",
         "recommended_config": ev["config"], "cross_validation": ev["cross_validation"],

@@ -25,7 +25,7 @@ looked at during development, scored by the frozen model and settings ([reports/
 | PhishLens — high-confidence phishing only | **0.998** | 0.814 | 0.896 | **0.2%** |
 
 Development split (600 pages, used during rule design, so an optimistic estimate): F1 0.909;
-rules alone F1 0.477. Mean decision latency 93.84 ms · 71/71 automated tests passing.
+rules alone F1 0.477. Mean decision latency 93.84 ms · 222/222 automated tests passing (incl. browser end-to-end).
 Model comparison, charts and the false-positive analysis: [reports/evaluation.md](reports/evaluation.md) · [docs/test-plan.md](docs/test-plan.md).
 
 ## Quick start (VS Code, any laptop)
@@ -56,6 +56,17 @@ A captioned recording of the whole scenario is produced by `python scripts/recor
 6. **admin** → Config → untick **R06** (the rule coverage report shows it fires more on benign pages) with a reason →
    re-analyze the phishing page → the result records config v2 and R06 as disabled.
 7. Admin → Audit log → **Verify hash chain**. Restart the server → data and chain survive.
+
+## Quality
+
+Full QA audit: [docs/qa-report.md](docs/qa-report.md) — 15 findings fixed, 222 tests, 92.6% coverage,
+WCAG 2 AA checks on every screen, 20-user load test. CI runs lint, security scan, dependency audit,
+tests on Python 3.11–3.13 (coverage ≥ 90%) and the browser suite on every push.
+
+```bash
+pip install -r requirements-dev.txt && python -m playwright install chromium
+ruff check . && pytest -q          # everything, incl. browser end-to-end tests
+```
 
 ## Reproduce the evaluation
 

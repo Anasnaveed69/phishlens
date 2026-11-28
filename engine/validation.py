@@ -1,7 +1,7 @@
-"""Input validation for uploaded pages, declared URLs and dataset archives.
+"""Input validation for uploaded pages, declared URLs, and dataset archives.
 
-Pure functions: no DB, no web framework, so they're easy to unit test.
-Nothing here ever executes, renders or fetches the submitted content.
+Pure functions — no DB, no web framework — so they are easy to unit test.
+Nothing here ever executes, renders, or fetches the submitted content.
 """
 from __future__ import annotations
 
@@ -75,7 +75,7 @@ def validate_url(url: str | None) -> str | None:
         host = parts.hostname
         _ = parts.port  # raises ValueError for a malformed port
     except ValueError:
-        raise InputError("INVALID_INPUT", "The URL is malformed.")
+        raise InputError("INVALID_INPUT", "The URL is malformed.") from None
     if parts.scheme.lower() not in {"http", "https"} or not host:
         raise InputError("INVALID_INPUT", "The URL must start with http:// or https:// and include a host.")
     return url
@@ -111,7 +111,7 @@ def read_dataset_zip(content: bytes, max_total_bytes: int, max_files: int, max_f
     try:
         zf = zipfile.ZipFile(io.BytesIO(content))
     except zipfile.BadZipFile:
-        raise InputError("UNSUPPORTED_TYPE", "The archive is not a valid .zip file.")
+        raise InputError("UNSUPPORTED_TYPE", "The archive is not a valid .zip file.") from None
 
     infos = [i for i in zf.infolist() if not i.is_dir()]
     if len(infos) > max_files + 1:
@@ -123,9 +123,12 @@ def read_dataset_zip(content: bytes, max_total_bytes: int, max_files: int, max_f
     label_info = next((i for i in infos if PurePosixPath(i.filename).name.lower() == "labels.csv"), None)
     if label_info:
         text = zf.read(label_info).decode("utf-8", errors="replace")
-        for row in csv.DictReader(io.StringIO(text)):
-            fname = safe_filename(row.get("filename", ""))
-            labels[fname] = (validate_label(row.get("label")), validate_url(row.get("source_url")))
+        for line_no, row in enumerate(csv.DictReader(io.StringIO(text)), start=2):
+            fname = safe_filename(row.get("filename") or "")
+            try:
+                labels[fname] = (validate_label(row.get("label")), validate_url(row.get("source_url")))
+            except InputError as exc:  # say exactly which row is wrong
+                raise InputError(exc.code, f"labels.csv line {line_no} ({fname}): {exc.message}") from None
 
     items: list[DatasetItem] = []
     total = 0

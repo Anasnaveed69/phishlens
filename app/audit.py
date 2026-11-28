@@ -8,12 +8,13 @@ detectable against an external copy of the last hash, which /api/admin/audit/ver
 """
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import hmac
 import json
 import os
-import secrets as _secrets
 import re
+import secrets as _secrets
 import sqlite3
 from typing import Any
 
@@ -54,10 +55,8 @@ def _key() -> bytes:
         if not path.exists():
             settings.secret_dir.mkdir(parents=True, exist_ok=True)
             path.write_text(_secrets.token_hex(32), encoding="utf-8")
-            try:
+            with contextlib.suppress(OSError):
                 os.chmod(path, 0o600)
-            except OSError:
-                pass
         _KEY = bytes.fromhex(path.read_text(encoding="utf-8").strip())
     return _KEY
 

@@ -1,12 +1,12 @@
-"""Safe feature extraction from a saved page + its declared URL.
+"""Feature extraction from a saved page and its declared URL.
 
 Safety rules (FR-2):
-  * HTML is parsed with BeautifulSoup's pure-Python parser. Scripts are never executed,
-    nothing is rendered, and no URL in the page is ever requested.
+  * HTML is parsed with BeautifulSoup's pure-Python parser.  Scripts are never
+    executed, nothing is rendered, and no URL in the page is ever requested.
   * Evidence snippets are short and truncated so reports never carry the full page.
 
-Feature groups: URL, DOM, text, and "visual-risk" signals that can be derived from
-markup alone (external favicon/logo, brand-in-title mismatch, hidden elements).
+Feature groups: URL, DOM, text, and "visual-risk" signals derived from markup alone
+(external favicon/logo, brand-in-title mismatch, hidden elements).
 """
 from __future__ import annotations
 
@@ -19,6 +19,10 @@ from urllib.parse import urljoin, urlsplit
 from bs4 import BeautifulSoup
 
 FEATURE_VERSION = "features-2.2"
+
+# ---------------------------------------------------------------------------
+# Vocabulary constants used by feature extraction and rule evaluation
+# ---------------------------------------------------------------------------
 
 BRANDS = [
     "paypal", "microsoft", "office365", "outlook", "apple", "icloud", "google", "gmail", "amazon",
@@ -59,10 +63,14 @@ SUSPICIOUS_TLDS = {"tk", "ml", "ga", "cf", "gq", "xyz", "top", "zip", "mov", "cl
                    "shop", "cyou", "icu", "buzz", "sbs", "cfd", "rest", "bond", "lol", "live", "online", "site",
                    "store", "cc", "support", "help", "monster", "quest", "best", "beauty", "hair", "skin"}
 OBFUSCATION_PATTERNS = [r"\beval\s*\(", r"\batob\s*\(", r"\bunescape\s*\(", r"fromCharCode", r"document\.write\s*\("]
+
+# Multi-part second-level domains: used by registrable_domain() to handle
+# country-code TLDs like .co.uk, .com.au, .gov.pk, etc.
 _MULTI_PART_SLD = {"co", "com", "org", "net", "gov", "edu", "ac"}
 
-# Numeric features used by the ML model, in a fixed order. Changing this list
-# requires retraining the model (the model stores the order it was trained with).
+# Numeric features fed to the ML model, in a fixed declared order.
+# Adding or removing any entry requires retraining; the saved model records
+# the order it was trained with and refuses to load on a mismatch.
 NUMERIC_FEATURES = [
     "url_length", "num_dots", "num_subdomains", "has_ip_host", "has_at_symbol", "hyphens_in_host",
     "uses_https", "suspicious_url_tokens", "has_punycode", "suspicious_tld", "path_depth", "has_port",
@@ -368,7 +376,8 @@ def extract(html: str, url: str | None = None) -> FeatureResult:
                                     if re.search(r"display\s*:\s*none|visibility\s*:\s*hidden", t["style"], re.I))
 
     missing = [n for n in NUMERIC_FEATURES if n not in values]
-    assert not missing, f"feature(s) not computed: {missing}"
+    if missing:  # programming error; never silently feed the model a short vector
+        raise RuntimeError(f"feature(s) not computed: {missing}")
     return FeatureResult(values=values, evidence=evidence, page_domain=page_domain, brands_found=brands)
 
 

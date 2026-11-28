@@ -13,7 +13,7 @@ import json
 import statistics
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -70,7 +70,7 @@ def main() -> None:
     for m in res.values():
         m["roc_auc"] = round(float(roc_auc_score(y, score)), 4)
     report = {
-        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "dataset": {"path": str(data), "name": args.name or data.name, "pages": len(rows),
                     "phishing": int(y.sum()), "benign": int(len(y) - y.sum())},
         "model_version": meta["version"], "config": cfg, "results": res,
@@ -85,7 +85,7 @@ def main() -> None:
         w = csv.DictWriter(f, fieldnames=list(errors[0]) if errors else ["type"])
         w.writeheader()
         w.writerows(errors)
-    s, h = res["served@suspicious"], res["served@phishing"]
+    _s, _h = res["served@suspicious"], res["served@phishing"]
     md = [f"# Fresh holdout — {report['dataset']['name']}", "",
           f"{len(rows)} pages never seen during development ({report['dataset']['phishing']} phishing / {report['dataset']['benign']} benign), "
           f"scored with the frozen model `{meta['version']}` and config {cfg}. Nothing was tuned on these pages.", "",

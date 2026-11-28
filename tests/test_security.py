@@ -122,7 +122,8 @@ def test_disabled_user_loses_access_immediately(client):
     ha = login(client, "admin")
     users = client.get("/api/admin/users", headers=ha).json()["items"]
     me = next(u for u in users if u["username"] == "admin")
-    assert client.patch(f"/api/admin/users/{me['id']}", headers=ha, json={"disabled": True}).status_code == 409
+    assert client.patch(f"/api/admin/users/{me['id']}", headers=ha, json={"disabled": True}).status_code == 422  # unconfirmed
+    assert client.patch(f"/api/admin/users/{me['id']}", headers=ha, json={"disabled": True, "confirm": True}).status_code == 409
 
 
 def test_audit_chain_survives_concurrent_requests(client):
@@ -168,7 +169,8 @@ def test_duplicate_upload_uses_new_declared_url(client):
 
 
 def test_import_with_analysis_respects_rate_limit(client, monkeypatch):
-    import io, zipfile
+    import io
+    import zipfile
     from app.routers import samples
     from app.security.ratelimit import RateLimiter
     monkeypatch.setattr(samples, "analyze_limiter", RateLimiter(5, 60))
@@ -194,3 +196,17 @@ def test_corrupt_model_metadata_falls_back_to_rules(tmp_path, monkeypatch):
     finally:
         monkeypatch.undo()
         services.load_model()
+
+
+def test_restore_without_audit_key_is_detected(client, monkeypatch):
+    """Backup docs: data/ restored without secrets/audit.key cannot pass verification."""
+    from app import audit
+    from app.db import connect
+    login(client, "admin")
+    conn = connect()
+    try:
+        assert audit.verify_chain(conn)["valid"] is True
+        monkeypatch.setattr(audit, "_KEY", bytes(32))  # a different (e.g. freshly generated) key
+        assert audit.verify_chain(conn)["valid"] is False
+    finally:
+        conn.close()

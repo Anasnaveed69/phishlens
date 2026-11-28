@@ -1,6 +1,7 @@
-"""Stable error codes. Clients rely on `code`; messages are generic on purpose.
+"""Stable API error codes and global exception handlers.
 
-Never put stack traces, SQL, file paths or internal details in a response.
+Clients rely on the `code` field; messages are intentionally generic.
+Never include stack traces, SQL, file paths, or internal details in a response.
 """
 from __future__ import annotations
 
@@ -35,6 +36,7 @@ UNSUPPORTED_TYPE = (415, "UNSUPPORTED_TYPE", "Only .html / .htm files (or a .zip
 RATE_LIMITED = (429, "RATE_LIMITED", "Too many requests. Please wait and try again.")
 CONFLICT = (409, "CONFLICT", "The request conflicts with the current state.")
 INTERNAL_ERROR = (500, "INTERNAL_ERROR", "Something went wrong. The error has been logged.")
+SAMPLE_PURGED = (410, "SAMPLE_PURGED", "The stored page was deleted by the retention policy; upload it again to re-analyse.")
 
 
 def err(spec: tuple[int, str, str], message: str | None = None, fields: list[str] | None = None) -> ApiError:
@@ -71,7 +73,15 @@ def install_handlers(app: FastAPI) -> None:
         return JSONResponse(_body("HTTP_ERROR", "Request failed."), status_code=exc.status_code)
 
     @app.exception_handler(Exception)
-    async def _unhandled(_: Request, exc: Exception):
+    async def _unhandled(request: Request, exc: Exception):
         ref = uuid.uuid4().hex[:12]
         log.exception("Unhandled error ref=%s", ref)  # full trace stays in server logs only
+        try:  # failures are security-relevant events too; record them without internal details
+            from . import audit
+            audit.record_separately(action="system.error", outcome="failure",
+                                    target=f"{request.method} {request.url.path}",
+                                    ip=request.client.host if request.client else None,
+                                    details={"ref": ref, "type": type(exc).__name__})
+        except Exception:  # never let logging failures mask the original error
+            log.exception("could not audit error ref=%s", ref)
         return JSONResponse(_body(*INTERNAL_ERROR[1:], ref=ref), status_code=500)

@@ -1,4 +1,4 @@
-"""Application settings, loaded from environment variables (or a local .env file).
+"""Application settings — loaded from environment variables or a local .env file.
 
 Nothing secret is hard-coded here. Copy .env.example to .env for local runs.
 """
@@ -35,15 +35,18 @@ def _int(name: str, default: int) -> int:
 
 @dataclass(frozen=True)
 class Settings:
+    # --- paths ---
     db_path: Path = field(default_factory=lambda: Path(os.environ.get("PHISHLENS_DB", BASE_DIR / "data" / "phishlens.db")))
     sample_dir: Path = field(default_factory=lambda: Path(os.environ.get("PHISHLENS_SAMPLE_DIR", BASE_DIR / "data" / "samples")))
     model_path: Path = field(default_factory=lambda: Path(os.environ.get("PHISHLENS_MODEL", BASE_DIR / "models" / "model.joblib")))
 
+    # --- size limits ---
     session_ttl_minutes: int = field(default_factory=lambda: _int("PHISHLENS_SESSION_TTL_MIN", 30))
     max_upload_bytes: int = field(default_factory=lambda: _int("PHISHLENS_MAX_UPLOAD_BYTES", 2 * 1024 * 1024))
     max_import_bytes: int = field(default_factory=lambda: _int("PHISHLENS_MAX_IMPORT_BYTES", 20 * 1024 * 1024))
     max_import_files: int = field(default_factory=lambda: _int("PHISHLENS_MAX_IMPORT_FILES", 500))
 
+    # --- rate limits ---
     login_rate_limit: int = field(default_factory=lambda: _int("PHISHLENS_LOGIN_RATE", 5))       # attempts / minute
     analyze_rate_limit: int = field(default_factory=lambda: _int("PHISHLENS_ANALYZE_RATE", 30))  # requests / minute
 
@@ -53,6 +56,11 @@ class Settings:
     # Optional: pin the expected SHA-256 of models/model.joblib (e.g. in .env) so a swapped model is refused
     # even if its .meta.json was edited too.
     model_sha256: str = field(default_factory=lambda: os.environ.get("PHISHLENS_MODEL_SHA256", "").strip().lower())
+
+    # Auto-delete stored raw pages older than this many days at startup (0 = keep forever).
+    retention_days: int = field(default_factory=lambda: _int("PHISHLENS_RETENTION_DAYS", 0))
+    # Interactive API docs at /api/docs. Handy locally; set to 0 for a shared deployment.
+    api_docs: bool = field(default_factory=lambda: os.environ.get("PHISHLENS_API_DOCS", "1") == "1")
 
     # Set to "1" only when served over HTTPS. Locally we run on http://127.0.0.1.
     cookie_secure: bool = field(default_factory=lambda: os.environ.get("PHISHLENS_COOKIE_SECURE", "0") == "1")

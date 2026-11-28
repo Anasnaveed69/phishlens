@@ -4,12 +4,12 @@ from __future__ import annotations
 import json
 import statistics
 from collections import Counter
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 
 from fastapi import APIRouter, Depends
 
 from .. import services
-from ..db import current_config, get_conn
+from ..db import current_config, read_conn
 from ..security.deps import Principal, require
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
@@ -17,8 +17,8 @@ router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
 @router.get("")
 def dashboard(principal: Principal = Depends(require("result:read"))):
-    since_24h = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat(timespec="seconds")
-    with get_conn() as conn:
+    since_24h = (datetime.now(UTC) - timedelta(hours=24)).isoformat(timespec="seconds")
+    with read_conn() as conn:
         by_decision = {r["decision"]: r["n"] for r in conn.execute(
             "SELECT decision, COUNT(*) AS n FROM analyses GROUP BY decision")}
         last_24h = conn.execute("SELECT COUNT(*) AS n FROM analyses WHERE created_at >= ?", (since_24h,)).fetchone()["n"]

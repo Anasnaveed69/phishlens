@@ -32,6 +32,10 @@ configuration (thresholds/rules), the trained model file, and the audit log.
 
 | T16 | **Model learns a dataset shortcut** (T, integrity of decisions) | ML model | Explanations expose it (page-size features dominated small benign pages); size-feature ablation evaluated; brand-ownership feature; fixtures checked as a generalisation test | `reports/evaluation.md`, report §6.2 |
 
+| T17 | **Over-retention of hostile/sensitive page content** (I) | stored samples | Admin purge + `PHISHLENS_RETENTION_DAYS` auto-purge of raw HTML; results keep only truncated evidence; purge is confirmed and audited | `test_purge_removes_raw_pages_but_keeps_results` |
+| T18 | **Unconfirmed privilege change / model swap** (E/T) | admin API | Server-side `confirm` required for role/disable changes, config changes, model reload and purge; sessions of a changed user are revoked | `test_user_management_rules`, `test_model_reload_requires_confirmation_and_is_audited` |
+| T19 | **Silent failures** (R) | all | Unhandled errors return a generic 500 with a reference id and are written to the audit log as `system.error` | `test_unhandled_errors_are_generic_and_audited` |
+
 ## Residual risks
 See [limitations-ethics.md](limitations-ethics.md): single-process, IP-keyed rate limiter (shared IP can lock
 an account), local HTTP (no TLS) in the demo, someone holding both the audit key and the DB (or the model and its

@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from fastapi import Request
 
 from .. import audit
-from ..db import get_conn
+from ..db import read_conn
 from ..errors import AUTH_REQUIRED, CSRF_FAILED, FORBIDDEN, err
 from .sessions import COOKIE_NAME, csrf_matches, load_session
 
@@ -30,23 +30,28 @@ UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 @dataclass(frozen=True)
 class Principal:
+    """Authenticated user context attached to a validated request."""
+
     user_id: str
     username: str
     role: str
     csrf_token: str
 
     def can(self, permission: str) -> bool:
+        """Check whether this principal's role grants the given permission."""
         return permission in PERMISSIONS.get(self.role, set())
 
 
 def client_ip(request: Request) -> str | None:
+    """Extract the peer IP address from the incoming FastAPI request."""
     return request.client.host if request.client else None
 
 
 def get_principal(request: Request) -> Principal:
+    """Resolve the session cookie to a Principal and enforce CSRF on unsafe methods."""
     token = request.cookies.get(COOKIE_NAME)
-    with get_conn() as conn:
-        row = load_session(conn, token)
+    with read_conn() as conn:
+        row = load_session(conn, token, purge=False)
     if row is None:
         raise err(AUTH_REQUIRED)
     principal = Principal(row["user_id"], row["username"], row["role"], row["csrf_token"])
@@ -61,6 +66,7 @@ def get_principal(request: Request) -> Principal:
 
 
 def require(permission: str):
+    """Build a FastAPI dependency that enforces an RBAC permission and audits denials."""
     def _dep(request: Request) -> Principal:
         principal = get_principal(request)
         if not principal.can(permission):

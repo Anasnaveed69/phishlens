@@ -77,7 +77,8 @@ any decision can be reproduced; `audit_events` carries `prev_hash`/`hash`.
 ### Audit event format
 
 `seq, id, ts, actor, role, action, target, outcome (success|denied|failure), ip, details (redacted JSON), prev_hash, hash`.
-Actions logged: `auth.login`, `auth.logout`, `authz.denied`, `security.csrf_failed`, `sample.upload`, `sample.label`,
+Actions logged: `auth.login`, `auth.logout`, `auth.password_change`, `authz.denied`, `security.csrf_failed`,
+`system.error` (unhandled failures, with a reference id only), `sample.upload`, `sample.update`, `sample.label`, `sample.purge`,
 `dataset.import`, `analysis.decision`, `analysis.submit` (rate limited), `feedback.submit`, `report.export`,
 `config.update`, `user.create`, `user.update`, `model.reload`, `audit.verify`.
 
@@ -97,4 +98,17 @@ Actions logged: `auth.login`, `auth.logout`, `authz.denied`, `security.csrf_fail
 | GET | `/api/admin/audit`, `/api/admin/audit/verify` | audit:read |
 | GET/POST | `/api/admin/model`, `/api/admin/model/reload` | config:read / config:write |
 | GET | `/api/dashboard` | result:read |
+| GET | `/api/analyses/meta/features` | result:read |
+| POST | `/api/admin/samples/purge` (retention; `confirm` required) | config:write |
 | POST | `/api/auth/password` | session |
+
+## Concurrency and transactions
+
+* **Writes** (`db.get_conn()`) take an in-process lock and then SQLite's `BEGIN IMMEDIATE`, so the audit
+  chain's "read last hash → insert" can never interleave and writers queue fairly instead of SQLite's
+  back-off retries (which starved some writers for up to 8 s under load).
+* **Reads** (`db.read_conn()`) use a deferred transaction on the WAL snapshot and never take the write lock,
+  so page views, history and the per-request session check do not wait behind uploads.
+* Measured with `scripts/load_test.py` (20 concurrent analysts, 30 s): see [qa-report.md](qa-report.md).
+* The lock and the rate limiter are per process: run a single worker (`uvicorn app.main:app`), which is the
+  supported local deployment.
