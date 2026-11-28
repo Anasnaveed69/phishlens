@@ -14,7 +14,7 @@ function h(tag, attrs = {}, ...children) {
     else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
     else el.setAttribute(k, v === true ? "" : v);
   }
-  for (const c of children.flat()) {
+  for (const c of children.flat(Infinity)) {
     if (c === null || c === undefined || c === false) continue;
     el.append(c instanceof Node ? c : document.createTextNode(String(c)));
   }
@@ -534,14 +534,18 @@ async function adminAudit(body) {
 
 async function adminModel(body) {
   const m = await api("/api/admin/model");
-  body.replaceChildren(
-    h("dl", { class: "kv" }, Object.entries(m).filter(([k]) => k !== "test_metrics").map(([k, v]) => [h("dt", {}, k), h("dd", { class: "mono" }, String(v))])),
-    m.test_metrics ? [h("h3", {}, "Held-out test metrics (from training)"),
-      h("dl", { class: "kv" }, Object.entries(m.test_metrics).map(([k, v]) => [h("dt", {}, k), h("dd", { class: "mono" }, typeof v === "object" ? JSON.stringify(v) : String(v))]))] : null,
-    h("div", { class: "row" }, can("config:write") && h("button", { onclick: async () => {
-      try { const r = await api("/api/admin/model/reload", { method: "POST" }); toast(`Model status: ${r.status}`); adminView("model"); }
-      catch (ex) { toast(ex.message, true); }
-    } }, "Reload model from disk")));
+  const kvEntries = Object.entries(m).filter(([k]) => k !== "test_metrics").flatMap(([k, v]) => [h("dt", {}, k), h("dd", { class: "mono" }, String(v))]);
+  const elements = [h("dl", { class: "kv" }, ...kvEntries)];
+  if (m.test_metrics) {
+    elements.push(h("h3", {}, "Held-out test metrics (from training)"));
+    const metricEntries = Object.entries(m.test_metrics).flatMap(([k, v]) => [h("dt", {}, k), h("dd", { class: "mono" }, typeof v === "object" ? JSON.stringify(v) : String(v))]);
+    elements.push(h("dl", { class: "kv" }, ...metricEntries));
+  }
+  elements.push(h("div", { class: "row" }, can("config:write") && h("button", { onclick: async () => {
+    try { const r = await api("/api/admin/model/reload", { method: "POST" }); toast(`Model status: ${r.status}`); adminView("model"); }
+    catch (ex) { toast(ex.message, true); }
+  } }, "Reload model from disk")));
+  body.replaceChildren(...elements);
 }
 
 // ------------------------------------------------------------------ router
